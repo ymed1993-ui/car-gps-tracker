@@ -52,10 +52,15 @@
 const FIREBASE_URL =
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
 
+const HISTORY_URL =
+  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/history.json";
+
+
 const map = L.map("map").setView(
   [38.54645, 68.91205],
   16
 );
+
 
 L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -65,11 +70,71 @@ L.tileLayer(
   }
 ).addTo(map);
 
+
 const marker = L.marker(
   [38.54645, 68.91205]
 ).addTo(map);
 
+
+/* ЛИНИЯ МАРШРУТА */
+
+const routeLine = L.polyline([], {
+  color: "blue",
+  weight: 5,
+  opacity: 0.8
+}).addTo(map);
+
+
 let firstUpdate = true;
+
+
+/* ЗАГРУЖАЕМ ИСТОРИЮ МАРШРУТА */
+
+async function loadHistory() {
+
+  try {
+
+    const response = await fetch(
+      HISTORY_URL + "?t=" + Date.now(),
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      return;
+    }
+
+    const history = await response.json();
+
+    if (!history) {
+      return;
+    }
+
+    const points = Object.values(history)
+      .filter(item =>
+        typeof item.latitude === "number" &&
+        typeof item.longitude === "number"
+      )
+      .sort((a, b) =>
+        (a.timestamp || 0) - (b.timestamp || 0)
+      )
+      .map(item => [
+        item.latitude,
+        item.longitude
+      ]);
+
+    routeLine.setLatLngs(points);
+
+  } catch (error) {
+
+    console.log("Ошибка истории:", error);
+
+  }
+}
+
+
+/* ТЕКУЩЕЕ ПОЛОЖЕНИЕ */
 
 async function updateCar() {
 
@@ -93,15 +158,20 @@ async function updateCar() {
       typeof data.latitude !== "number" ||
       typeof data.longitude !== "number"
     ) {
+
       document.getElementById("status").textContent =
         "Нет данных";
+
       return;
     }
+
 
     const lat = data.latitude;
     const lon = data.longitude;
 
+
     marker.setLatLng([lat, lon]);
+
 
     if (firstUpdate) {
 
@@ -112,17 +182,8 @@ async function updateCar() {
 
       firstUpdate = false;
 
-    } else {
-
-      map.panTo(
-        [lat, lon],
-        {
-          animate: true,
-          duration: 1
-        }
-      );
-
     }
+
 
     /* СКОРОСТЬ */
 
@@ -165,6 +226,7 @@ async function updateCar() {
 
     }
 
+
   } catch (error) {
 
     document.getElementById("status").textContent =
@@ -173,11 +235,24 @@ async function updateCar() {
   }
 }
 
+
+/* ПЕРВЫЙ ЗАПУСК */
+
 updateCar();
 
-/* Проверяем координаты каждые 3 секунды */
+loadHistory();
 
-setInterval(updateCar, 3000);
+
+/* ОБНОВЛЯЕМ КАЖДЫЕ 3 СЕКУНДЫ */
+
+setInterval(() => {
+
+  updateCar();
+
+  loadHistory();
+
+}, 3000);
+
 
 </script>
 
