@@ -14,21 +14,10 @@
 
 <br>
 
-<div>
-  Широта: <span id="lat">---</span>
-</div>
-
-<div>
-  Долгота: <span id="lon">---</span>
-</div>
-
-<div>
-  Скорость: <span id="speed">---</span> км/ч
-</div>
-
-<div>
-  Точность: <span id="accuracy">---</span> м
-</div>
+<div>Широта: <span id="lat">---</span></div>
+<div>Долгота: <span id="lon">---</span></div>
+<div>Скорость: <span id="speed">---</span> км/ч</div>
+<div>Точность: <span id="accuracy">---</span> м</div>
 
 <div>
   Последнее обновление:
@@ -39,7 +28,6 @@
   Участок:
   <span id="segment">---</span>
 </div>
-
 
 <script>
 
@@ -53,73 +41,50 @@ const HISTORY_BASE =
   FIREBASE_BASE + "/history";
 
 
-/* ========================================
+/* =========================
    НАСТРОЙКИ
-======================================== */
-
-const SEGMENT_TIME =
-  30 * 60 * 1000;       // 30 минут
+========================= */
 
 const HISTORY_LIFETIME =
-  24 * 60 * 60 * 1000;  // 24 часа
+  24 * 60 * 60 * 1000;
 
-const MIN_DISTANCE =
-  10;                    // 10 метров
-
-
-/* ========================================
-   ВРЕМЯ ЗАПУСКА
-======================================== */
-
-const trackerStartTime =
-  Date.now();
+const MIN_DISTANCE = 10;
 
 
-/* Последняя записанная GPS-точка */
+/* Последняя сохранённая точка */
 
 let lastHistoryLat = null;
 let lastHistoryLon = null;
 
 
-/* Чтобы очистка Firebase не запускалась
-   при каждой GPS-точке */
+/* Текущий участок */
+
+let lastSegmentId = null;
+
+
+/* Последняя очистка */
 
 let lastCleanupTime = 0;
 
 
-/* ========================================
-   РАССТОЯНИЕ МЕЖДУ GPS-ТОЧКАМИ
-======================================== */
+/* =========================
+   РАССТОЯНИЕ
+========================= */
 
-function getDistance(
-  lat1,
-  lon1,
-  lat2,
-  lon2
-) {
+function getDistance(lat1, lon1, lat2, lon2) {
 
   const R = 6371000;
+  const rad = Math.PI / 180;
 
-  const rad =
-    Math.PI / 180;
-
-  const dLat =
-    (lat2 - lat1) * rad;
-
-  const dLon =
-    (lon2 - lon1) * rad;
-
+  const dLat = (lat2 - lat1) * rad;
+  const dLon = (lon2 - lon1) * rad;
 
   const a =
-    Math.sin(dLat / 2) *
-    Math.sin(dLat / 2) +
-
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * rad) *
     Math.cos(lat2 * rad) *
-
     Math.sin(dLon / 2) *
     Math.sin(dLon / 2);
-
 
   const c =
     2 * Math.atan2(
@@ -127,65 +92,67 @@ function getDistance(
       Math.sqrt(1 - a)
     );
 
-
   return R * c;
-
 }
 
 
-/* ========================================
-   ТЕКУЩИЙ 30-МИНУТНЫЙ УЧАСТОК
-======================================== */
+/* =========================
+   ФИКСИРОВАННЫЙ УЧАСТОК
+   01:00-01:30
+   01:30-02:00
+   02:00-02:30
+========================= */
 
 function getCurrentSegment() {
 
-  const now =
-    Date.now();
+  const now = new Date();
 
+  const start = new Date(now);
 
-  const segmentNumber =
-    Math.floor(
-      (now - trackerStartTime) /
-      SEGMENT_TIME
-    );
+  start.setSeconds(0);
+  start.setMilliseconds(0);
 
+  if (now.getMinutes() < 30) {
 
-  const start =
-    trackerStartTime +
-    segmentNumber *
-    SEGMENT_TIME;
+    start.setMinutes(0);
+
+  } else {
+
+    start.setMinutes(30);
+
+  }
 
 
   const end =
-    start +
-    SEGMENT_TIME;
+    new Date(
+      start.getTime() +
+      30 * 60 * 1000
+    );
 
 
   return {
-    number: segmentNumber,
-    start: start,
-    end: end
+    start: start.getTime(),
+    end: end.getTime()
   };
-
 }
 
 
-/* ========================================
-   НАЗВАНИЕ УЧАСТКА
-======================================== */
+/* =========================
+   ФОРМАТ ВРЕМЕНИ
+========================= */
 
 function formatTime(timestamp) {
 
-  return new Date(
-    timestamp
-  ).toLocaleTimeString(
-    [],
-    {
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
+  const date =
+    new Date(timestamp);
 
+  return String(
+    date.getHours()
+  ).padStart(2, "0") +
+    ":" +
+    String(
+      date.getMinutes()
+    ).padStart(2, "0");
 }
 
 
@@ -196,48 +163,36 @@ function getSegmentName(segment) {
     " - " +
     formatTime(segment.end)
   );
-
 }
 
-
-/* ========================================
-   ID УЧАСТКА ДЛЯ FIREBASE
-======================================== */
 
 function getSegmentId(segment) {
 
-  return String(
-    segment.start
-  );
-
+  return String(segment.start);
 }
 
 
-/* ========================================
-   УДАЛЯЕМ ИСТОРИЮ СТАРШЕ 24 ЧАСОВ
-======================================== */
+/* =========================
+   УДАЛЕНИЕ ИСТОРИИ
+   СТАРШЕ 24 ЧАСОВ
+========================= */
 
 async function cleanupOldHistory() {
 
-  const now =
-    Date.now();
+  const now = Date.now();
 
 
-  /* Проверяем очистку примерно
-     один раз в 10 минут */
+  /* Проверяем раз в 10 минут */
 
   if (
     now - lastCleanupTime <
     10 * 60 * 1000
   ) {
-
     return;
-
   }
 
 
-  lastCleanupTime =
-    now;
+  lastCleanupTime = now;
 
 
   try {
@@ -268,8 +223,7 @@ async function cleanupOldHistory() {
 
 
     const deleteBefore =
-      now -
-      HISTORY_LIFETIME;
+      now - HISTORY_LIFETIME;
 
 
     for (
@@ -277,13 +231,41 @@ async function cleanupOldHistory() {
       of Object.keys(history)
     ) {
 
-      const segmentStart =
-        Number(segmentId);
+      const segment =
+        history[segmentId];
+
+
+      let segmentEnd = 0;
 
 
       if (
-        !Number.isNaN(segmentStart) &&
-        segmentStart < deleteBefore
+        segment &&
+        segment.info &&
+        typeof segment.info.end === "number"
+      ) {
+
+        segmentEnd =
+          segment.info.end;
+
+      } else {
+
+        const start =
+          Number(segmentId);
+
+        if (!Number.isNaN(start)) {
+
+          segmentEnd =
+            start +
+            30 * 60 * 1000;
+
+        }
+
+      }
+
+
+      if (
+        segmentEnd > 0 &&
+        segmentEnd < deleteBefore
       ) {
 
         await fetch(
@@ -309,13 +291,12 @@ async function cleanupOldHistory() {
     );
 
   }
-
 }
 
 
-/* ========================================
-   ОТПРАВКА GPS
-======================================== */
+/* =========================
+   ОТПРАВКА В FIREBASE
+========================= */
 
 async function sendToFirebase(
   lat,
@@ -331,14 +312,9 @@ async function sendToFirebase(
   const data = {
 
     latitude: lat,
-
     longitude: lon,
-
-    accuracy:
-      Math.round(accuracy),
-
+    accuracy: Math.round(accuracy),
     speed: speed,
-
     timestamp: now
 
   };
@@ -346,9 +322,7 @@ async function sendToFirebase(
 
   try {
 
-    /* --------------------------------
-       ТЕКУЩЕЕ ПОЛОЖЕНИЕ
-    -------------------------------- */
+    /* ТЕКУЩЕЕ ПОЛОЖЕНИЕ */
 
     const response =
       await fetch(
@@ -377,9 +351,9 @@ async function sendToFirebase(
     }
 
 
-    /* --------------------------------
-       ТЕКУЩИЙ 30-МИНУТНЫЙ УЧАСТОК
-    -------------------------------- */
+    /* =========================
+       ОПРЕДЕЛЯЕМ УЧАСТОК
+    ========================= */
 
     const segment =
       getCurrentSegment();
@@ -395,12 +369,33 @@ async function sendToFirebase(
       getSegmentName(segment);
 
 
-    /* --------------------------------
-       НУЖНО ЛИ СОХРАНЯТЬ ТОЧКУ
-    -------------------------------- */
+    /* =========================
+       НАЧАЛСЯ НОВЫЙ УЧАСТОК
+    ========================= */
 
-    let saveHistory =
-      false;
+    if (
+      lastSegmentId !== segmentId
+    ) {
+
+      lastSegmentId =
+        segmentId;
+
+      /*
+        Разрешаем первой точке
+        нового участка сохраниться
+      */
+
+      lastHistoryLat = null;
+      lastHistoryLon = null;
+
+    }
+
+
+    /* =========================
+       ПРОВЕРКА РАССТОЯНИЯ
+    ========================= */
+
+    let saveHistory = false;
 
 
     if (
@@ -408,8 +403,7 @@ async function sendToFirebase(
       lastHistoryLon === null
     ) {
 
-      saveHistory =
-        true;
+      saveHistory = true;
 
     } else {
 
@@ -423,35 +417,80 @@ async function sendToFirebase(
 
 
       if (
-        distance >=
-        MIN_DISTANCE
+        distance >= MIN_DISTANCE
       ) {
 
-        saveHistory =
-          true;
+        saveHistory = true;
 
       }
 
     }
 
 
-    /* --------------------------------
-       СОХРАНЯЕМ В НУЖНЫЙ УЧАСТОК
-    -------------------------------- */
+    /* =========================
+       СОХРАНЯЕМ ТОЧКУ
+    ========================= */
 
     if (saveHistory) {
 
-      const historyURL =
+      /* Сначала создаём INFO */
 
-        HISTORY_BASE +
-        "/" +
-        segmentId +
-        "/points.json";
+      const infoResponse =
+        await fetch(
 
+          HISTORY_BASE +
+          "/" +
+          segmentId +
+          "/info.json",
+
+          {
+            method: "PUT",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+
+                start:
+                  segment.start,
+
+                end:
+                  segment.end,
+
+                name:
+                  getSegmentName(
+                    segment
+                  )
+
+              })
+          }
+
+        );
+
+
+      if (!infoResponse.ok) {
+
+        throw new Error(
+          "Info: " +
+          infoResponse.status
+        );
+
+      }
+
+
+      /* Потом GPS-точку */
 
       const historyResponse =
         await fetch(
-          historyURL,
+
+          HISTORY_BASE +
+          "/" +
+          segmentId +
+          "/points.json",
+
           {
             method: "POST",
 
@@ -463,6 +502,7 @@ async function sendToFirebase(
             body:
               JSON.stringify(data)
           }
+
         );
 
 
@@ -476,48 +516,8 @@ async function sendToFirebase(
       }
 
 
-      /* Информация об участке */
-
-      await fetch(
-
-        HISTORY_BASE +
-        "/" +
-        segmentId +
-        "/info.json",
-
-        {
-          method: "PUT",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body:
-            JSON.stringify({
-
-              start:
-                segment.start,
-
-              end:
-                segment.end,
-
-              name:
-                getSegmentName(
-                  segment
-                )
-
-            })
-        }
-
-      );
-
-
-      lastHistoryLat =
-        lat;
-
-      lastHistoryLon =
-        lon;
+      lastHistoryLat = lat;
+      lastHistoryLon = lon;
 
     }
 
@@ -528,8 +528,6 @@ async function sendToFirebase(
       "GPS работает • координаты отправлены";
 
 
-    /* Проверяем старую историю */
-
     cleanupOldHistory();
 
 
@@ -538,7 +536,6 @@ async function sendToFirebase(
     document
       .getElementById("status")
       .textContent =
-
       "GPS работает • ошибка отправки: " +
       error.message;
 
@@ -547,13 +544,11 @@ async function sendToFirebase(
 }
 
 
-/* ========================================
-   ПОЛУЧАЕМ GPS
-======================================== */
+/* =========================
+   GPS
+========================= */
 
-function updatePosition(
-  position
-) {
+function updatePosition(position) {
 
   const lat =
     position.coords.latitude;
@@ -588,28 +583,23 @@ function updatePosition(
 
   document
     .getElementById("lat")
-    .textContent =
-    lat;
+    .textContent = lat;
 
 
   document
     .getElementById("lon")
-    .textContent =
-    lon;
+    .textContent = lon;
 
 
   document
     .getElementById("speed")
-    .textContent =
-    speed;
+    .textContent = speed;
 
 
   document
     .getElementById("accuracy")
     .textContent =
-    Math.round(
-      accuracy
-    );
+    Math.round(accuracy);
 
 
   document
@@ -635,50 +625,40 @@ function updatePosition(
 }
 
 
-/* ========================================
+/* =========================
    ОШИБКА GPS
-======================================== */
+========================= */
 
 function gpsError(error) {
 
   document
     .getElementById("status")
     .textContent =
-
     "Ошибка GPS: " +
     error.message;
 
 }
 
 
-/* ========================================
-   ЗАПУСК GPS
-======================================== */
+/* =========================
+   ЗАПУСК
+========================= */
 
-if (
-  "geolocation" in navigator
-) {
+if ("geolocation" in navigator) {
 
-  navigator
-    .geolocation
-    .watchPosition(
+  navigator.geolocation.watchPosition(
 
-      updatePosition,
+    updatePosition,
 
-      gpsError,
+    gpsError,
 
-      {
-        enableHighAccuracy:
-          true,
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    }
 
-        maximumAge:
-          0,
-
-        timeout:
-          20000
-      }
-
-    );
+  );
 
 } else {
 
