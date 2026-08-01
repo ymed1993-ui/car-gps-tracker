@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Карта автомобиля</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  >
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    #info {
+      padding: 15px;
+      font-size: 18px;
+    }
+
+    #map {
+      width: 100%;
+      height: calc(100vh - 100px);
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="info">
+  <b>GPS автомобиля</b><br>
+  Статус: <span id="status">Ожидание данных...</span><br>
+  Точность: <span id="accuracy">---</span> м
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const FIREBASE_URL =
+  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
+
+const map = L.map("map").setView([38.54645, 68.91205], 16);
+
+L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }
+).addTo(map);
+
+const marker = L.marker([38.54645, 68.91205]).addTo(map);
+
+async function updateCar() {
+
+  try {
+
+    const response = await fetch(FIREBASE_URL);
+
+    const data = await response.json();
+
+    if (!data) {
+      document.getElementById("status").textContent =
+        "Нет данных";
+      return;
+    }
+
+    const lat = data.latitude;
+    const lon = data.longitude;
+
+    marker.setLatLng([lat, lon]);
+
+    map.setView([lat, lon], map.getZoom());
+
+    document.getElementById("accuracy").textContent =
+      data.accuracy;
+
+    document.getElementById("status").textContent =
+      "Автомобиль онлайн";
+
+  } catch (error) {
+
+    document.getElementById("status").textContent =
+      "Ошибка подключения";
+
+  }
+}
+
+updateCar();
+
+setInterval(updateCar, 3000);
+
+</script>
+
+</body>
+</html>
