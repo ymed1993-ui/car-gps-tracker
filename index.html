@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPS автомобиля</title>
+</head>
+
+<body style="font-family:Arial; font-size:24px; padding:30px;">
+
+<h2>GPS автомобиля</h2>
+
+<div id="status">Ожидание GPS...</div>
+
+<br>
+
+<div>
+  Широта: <span id="lat">---</span>
+</div>
+
+<div>
+  Долгота: <span id="lon">---</span>
+</div>
+
+<div>
+  Точность: <span id="accuracy">---</span> м
+</div>
+
+<div>
+  Последнее обновление:
+  <span id="time">---</span>
+</div>
+
+<script>
+
+function updatePosition(position) {
+
+    document.getElementById("lat").textContent =
+        position.coords.latitude;
+
+    document.getElementById("lon").textContent =
+        position.coords.longitude;
+
+    document.getElementById("accuracy").textContent =
+        Math.round(position.coords.accuracy);
+
+    document.getElementById("time").textContent =
+        new Date().toLocaleTimeString();
+
+    document.getElementById("status").textContent =
+        "GPS работает";
+}
+
+function gpsError(error) {
+    document.getElementById("status").textContent =
+        "Ошибка GPS: " + error.message;
+}
+
+if ("geolocation" in navigator) {
+
+    navigator.geolocation.watchPosition(
+        updatePosition,
+        gpsError,
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 20000
+        }
+    );
+
+} else {
+    document.getElementById("status").textContent =
+        "Браузер не поддерживает GPS";
+}
+
+</script>
+
+</body>
+</html>
