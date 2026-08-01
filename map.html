@@ -1,95 +1,3 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Карта автомобиля</title>
-
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  >
-
-  <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      font-family: Arial, sans-serif;
-    }
-
-    #info {
-      padding: 12px 15px;
-      font-size: 18px;
-      box-sizing: border-box;
-      background: white;
-    }
-
-    #map {
-      width: 100%;
-      height: calc(100vh - 125px);
-    }
-  </style>
-</head>
-
-<body>
-
-<div id="info">
-  <b>GPS автомобиля</b><br>
-  Статус: <span id="status">Ожидание данных...</span><br>
-  Скорость: <span id="speed">---</span> км/ч<br>
-  Точность: <span id="accuracy">---</span> м<br>
-  Обновлено: <span id="time">---</span>
-</div>
-
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-
-const FIREBASE_URL =
-  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
-
-const HISTORY_URL =
-  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/history.json";
-
-
-const map = L.map("map").setView(
-  [38.54645, 68.91205],
-  16
-);
-
-
-L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap"
-  }
-).addTo(map);
-
-
-const marker = L.marker(
-  [38.54645, 68.91205]
-).addTo(map);
-
-
-/* ЛИНИЯ МАРШРУТА */
-
-const routeLine = L.polyline([], {
-  color: "blue",
-  weight: 5,
-  opacity: 0.8
-}).addTo(map);
-
-
-let firstUpdate = true;
-
-
-/* ЗАГРУЖАЕМ ИСТОРИЮ МАРШРУТА */
-
 async function loadHistory() {
 
   try {
@@ -111,150 +19,67 @@ async function loadHistory() {
       return;
     }
 
-    const points = Object.values(history)
+    const data = Object.values(history)
       .filter(item =>
         typeof item.latitude === "number" &&
-        typeof item.longitude === "number"
+        typeof item.longitude === "number" &&
+        typeof item.timestamp === "number" &&
+        (typeof item.accuracy !== "number" || item.accuracy <= 50)
       )
-      .sort((a, b) =>
-        (a.timestamp || 0) - (b.timestamp || 0)
-      )
-      .map(item => [
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+
+    const points = [];
+
+    let previousPoint = null;
+
+
+    for (const item of data) {
+
+      const currentPoint = L.latLng(
+        item.latitude,
+        item.longitude
+      );
+
+
+      if (previousPoint) {
+
+        const distance =
+          previousPoint.distanceTo(currentPoint);
+
+        /*
+          Если новая точка внезапно дальше
+          300 метров от предыдущей —
+          считаем её ошибкой GPS.
+        */
+
+        if (distance > 300) {
+          continue;
+        }
+
+      }
+
+
+      points.push([
         item.latitude,
         item.longitude
       ]);
 
+      previousPoint = currentPoint;
+
+    }
+
+
     routeLine.setLatLngs(points);
 
+
   } catch (error) {
 
-    console.log("Ошибка истории:", error);
-
-  }
-}
-
-
-/* ТЕКУЩЕЕ ПОЛОЖЕНИЕ */
-
-async function updateCar() {
-
-  try {
-
-    const response = await fetch(
-      FIREBASE_URL + "?t=" + Date.now(),
-      {
-        cache: "no-store"
-      }
+    console.log(
+      "Ошибка загрузки истории:",
+      error
     );
 
-    if (!response.ok) {
-      throw new Error("Firebase error");
-    }
-
-    const data = await response.json();
-
-    if (
-      !data ||
-      typeof data.latitude !== "number" ||
-      typeof data.longitude !== "number"
-    ) {
-
-      document.getElementById("status").textContent =
-        "Нет данных";
-
-      return;
-    }
-
-
-    const lat = data.latitude;
-    const lon = data.longitude;
-
-
-    marker.setLatLng([lat, lon]);
-
-
-    if (firstUpdate) {
-
-      map.setView(
-        [lat, lon],
-        17
-      );
-
-      firstUpdate = false;
-
-    }
-
-
-    /* СКОРОСТЬ */
-
-    if (typeof data.speed === "number") {
-
-      document.getElementById("speed").textContent =
-        Math.round(data.speed);
-
-    } else {
-
-      document.getElementById("speed").textContent =
-        "---";
-
-    }
-
-
-    /* ТОЧНОСТЬ */
-
-    document.getElementById("accuracy").textContent =
-      data.accuracy ?? "---";
-
-
-    /* СТАТУС */
-
-    document.getElementById("status").textContent =
-      "Автомобиль онлайн";
-
-
-    /* ВРЕМЯ */
-
-    if (data.timestamp) {
-
-      document.getElementById("time").textContent =
-        new Date(data.timestamp).toLocaleTimeString();
-
-    } else {
-
-      document.getElementById("time").textContent =
-        "---";
-
-    }
-
-
-  } catch (error) {
-
-    document.getElementById("status").textContent =
-      "Ошибка подключения";
-
   }
+
 }
-
-
-/* ПЕРВЫЙ ЗАПУСК */
-
-updateCar();
-
-loadHistory();
-
-
-/* ОБНОВЛЯЕМ КАЖДЫЕ 3 СЕКУНДЫ */
-
-setInterval(() => {
-
-  updateCar();
-
-  loadHistory();
-
-}, 3000);
-
-
-</script>
-
-</body>
-</html>
