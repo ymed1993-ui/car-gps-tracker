@@ -23,6 +23,10 @@
 </div>
 
 <div>
+  Скорость: <span id="speed">---</span> км/ч
+</div>
+
+<div>
   Точность: <span id="accuracy">---</span> м
 </div>
 
@@ -36,12 +40,14 @@
 const FIREBASE_URL =
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
 
-async function sendToFirebase(lat, lon, accuracy) {
+
+async function sendToFirebase(lat, lon, accuracy, speed) {
 
   const data = {
     latitude: lat,
     longitude: lon,
     accuracy: Math.round(accuracy),
+    speed: speed,
     timestamp: Date.now()
   };
 
@@ -76,8 +82,21 @@ function updatePosition(position) {
   const lon = position.coords.longitude;
   const accuracy = position.coords.accuracy;
 
+  // GPS отдаёт скорость в метрах в секунду.
+  // Переводим в км/ч.
+  let speed = position.coords.speed;
+
+  if (speed === null || speed < 0) {
+    speed = 0;
+  } else {
+    speed = Math.round(speed * 3.6);
+  }
+
   document.getElementById("lat").textContent = lat;
   document.getElementById("lon").textContent = lon;
+
+  document.getElementById("speed").textContent =
+    speed;
 
   document.getElementById("accuracy").textContent =
     Math.round(accuracy);
@@ -88,7 +107,7 @@ function updatePosition(position) {
   document.getElementById("status").textContent =
     "GPS работает • отправка...";
 
-  sendToFirebase(lat, lon, accuracy);
+  sendToFirebase(lat, lon, accuracy, speed);
 }
 
 
