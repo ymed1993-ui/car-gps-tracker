@@ -12,19 +12,23 @@
   >
 
   <style>
-    body {
+    html, body {
       margin: 0;
+      width: 100%;
+      height: 100%;
       font-family: Arial, sans-serif;
     }
 
     #info {
-      padding: 15px;
+      padding: 12px 15px;
       font-size: 18px;
+      box-sizing: border-box;
+      background: white;
     }
 
     #map {
       width: 100%;
-      height: calc(100vh - 100px);
+      height: calc(100vh - 105px);
     }
   </style>
 </head>
@@ -34,7 +38,8 @@
 <div id="info">
   <b>GPS автомобиля</b><br>
   Статус: <span id="status">Ожидание данных...</span><br>
-  Точность: <span id="accuracy">---</span> м
+  Точность: <span id="accuracy">---</span> м<br>
+  Обновлено: <span id="time">---</span>
 </div>
 
 <div id="map"></div>
@@ -46,7 +51,10 @@
 const FIREBASE_URL =
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
 
-const map = L.map("map").setView([38.54645, 68.91205], 16);
+const map = L.map("map").setView(
+  [38.54645, 68.91205],
+  16
+);
 
 L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -56,17 +64,34 @@ L.tileLayer(
   }
 ).addTo(map);
 
-const marker = L.marker([38.54645, 68.91205]).addTo(map);
+const marker = L.marker(
+  [38.54645, 68.91205]
+).addTo(map);
+
+let firstUpdate = true;
 
 async function updateCar() {
 
   try {
 
-    const response = await fetch(FIREBASE_URL);
+    const response = await fetch(
+      FIREBASE_URL + "?t=" + Date.now(),
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Firebase error");
+    }
 
     const data = await response.json();
 
-    if (!data) {
+    if (
+      !data ||
+      typeof data.latitude !== "number" ||
+      typeof data.longitude !== "number"
+    ) {
       document.getElementById("status").textContent =
         "Нет данных";
       return;
@@ -77,13 +102,44 @@ async function updateCar() {
 
     marker.setLatLng([lat, lon]);
 
-    map.setView([lat, lon], map.getZoom());
+    if (firstUpdate) {
+
+      map.setView(
+        [lat, lon],
+        17
+      );
+
+      firstUpdate = false;
+
+    } else {
+
+      map.panTo(
+        [lat, lon],
+        {
+          animate: true,
+          duration: 1
+        }
+      );
+
+    }
 
     document.getElementById("accuracy").textContent =
-      data.accuracy;
+      data.accuracy ?? "---";
 
     document.getElementById("status").textContent =
       "Автомобиль онлайн";
+
+    if (data.timestamp) {
+
+      document.getElementById("time").textContent =
+        new Date(data.timestamp).toLocaleTimeString();
+
+    } else {
+
+      document.getElementById("time").textContent =
+        new Date().toLocaleTimeString();
+
+    }
 
   } catch (error) {
 
@@ -95,6 +151,7 @@ async function updateCar() {
 
 updateCar();
 
+/* Проверяем новые координаты каждые 3 секунды */
 setInterval(updateCar, 3000);
 
 </script>
