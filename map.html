@@ -47,23 +47,47 @@
 <body>
 
 <div id="info">
+
   <b>GPS автомобиля</b><br>
-  Статус: <span id="status">Ожидание данных...</span><br>
-  Скорость: <span id="speed">---</span> км/ч<br>
-  Точность: <span id="accuracy">---</span> м<br>
-  Обновлено: <span id="time">---</span>
+
+  Статус:
+  <span id="status">Ожидание данных...</span>
+  <br>
+
+  Скорость:
+  <span id="speed">---</span> км/ч
+  <br>
+
+  Точность:
+  <span id="accuracy">---</span> м
+  <br>
+
+  Обновлено:
+  <span id="time">---</span>
 
   <div id="buttons">
-    <button onclick="showHistory()">Показать историю</button>
-    <button onclick="hideHistory()">Скрыть историю</button>
+    <button onclick="showHistory()">
+      Показать историю
+    </button>
+
+    <button onclick="hideHistory()">
+      Скрыть историю
+    </button>
   </div>
+
 </div>
 
 <div id="map"></div>
 
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+
 <script>
+
+/* =========================
+   FIREBASE
+========================= */
 
 const FIREBASE_URL =
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
@@ -72,12 +96,15 @@ const HISTORY_URL =
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/history.json";
 
 
-/* КАРТА */
+/* =========================
+   КАРТА
+========================= */
 
 const map = L.map("map").setView(
   [38.54645, 68.91205],
   16
 );
+
 
 L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -88,14 +115,18 @@ L.tileLayer(
 ).addTo(map);
 
 
-/* МАРКЕР */
+/* =========================
+   МАРКЕР АВТОМОБИЛЯ
+========================= */
 
 const marker = L.marker(
   [38.54645, 68.91205]
 ).addTo(map);
 
 
-/* ЛИНИЯ ИСТОРИИ */
+/* =========================
+   ЛИНИЯ ИСТОРИИ
+========================= */
 
 const routeLine = L.polyline([], {
   color: "blue",
@@ -107,7 +138,9 @@ const routeLine = L.polyline([], {
 let firstUpdate = true;
 
 
-/* ПОКАЗАТЬ ИСТОРИЮ */
+/* =========================
+   ПОКАЗАТЬ ИСТОРИЮ
+========================= */
 
 async function showHistory() {
 
@@ -120,11 +153,15 @@ async function showHistory() {
       }
     );
 
+
     if (!response.ok) {
       return;
     }
 
-    const history = await response.json();
+
+    const history =
+      await response.json();
+
 
     if (!history) {
       return;
@@ -132,17 +169,25 @@ async function showHistory() {
 
 
     const data = Object.values(history)
+
       .filter(item =>
+
         typeof item.latitude === "number" &&
+
         typeof item.longitude === "number" &&
+
         typeof item.timestamp === "number" &&
+
         (
           typeof item.accuracy !== "number" ||
           item.accuracy <= 50
         )
+
       )
-      .sort((a, b) =>
-        a.timestamp - b.timestamp
+
+      .sort(
+        (a, b) =>
+          a.timestamp - b.timestamp
       );
 
 
@@ -162,9 +207,12 @@ async function showHistory() {
       if (previousPoint) {
 
         const distance =
-          previousPoint.distanceTo(currentPoint);
+          previousPoint.distanceTo(
+            currentPoint
+          );
 
-        /* Убираем ошибочные скачки GPS */
+
+        /* Убираем большие ошибки GPS */
 
         if (distance > 300) {
           continue;
@@ -178,16 +226,22 @@ async function showHistory() {
         item.longitude
       ]);
 
-      previousPoint = currentPoint;
+
+      previousPoint =
+        currentPoint;
 
     }
 
 
-    routeLine.setLatLngs(points);
+    routeLine.setLatLngs(
+      points
+    );
 
 
     if (!map.hasLayer(routeLine)) {
+
       routeLine.addTo(map);
+
     }
 
 
@@ -203,60 +257,97 @@ async function showHistory() {
 }
 
 
-/* СКРЫТЬ ИСТОРИЮ */
+/* =========================
+   СКРЫТЬ ИСТОРИЮ
+========================= */
 
 function hideHistory() {
 
   if (map.hasLayer(routeLine)) {
-    map.removeLayer(routeLine);
+
+    map.removeLayer(
+      routeLine
+    );
+
   }
 
 }
 
 
-/* ТЕКУЩЕЕ ПОЛОЖЕНИЕ */
+/* =========================
+   ТЕКУЩАЯ ПОЗИЦИЯ
+========================= */
 
 async function updateCar() {
 
   try {
 
     const response = await fetch(
-      FIREBASE_URL + "?t=" + Date.now(),
+
+      FIREBASE_URL +
+      "?t=" +
+      Date.now(),
+
       {
         cache: "no-store"
       }
+
     );
 
+
     if (!response.ok) {
-      throw new Error("Firebase error");
+
+      throw new Error(
+        "Firebase error"
+      );
+
     }
 
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
 
     if (
+
       !data ||
+
       typeof data.latitude !== "number" ||
+
       typeof data.longitude !== "number"
+
     ) {
 
-      document.getElementById("status").textContent =
+      document
+        .getElementById("status")
+        .textContent =
         "Нет данных";
 
       return;
+
     }
 
 
-    const lat = data.latitude;
-    const lon = data.longitude;
+    const lat =
+      data.latitude;
 
+    const lon =
+      data.longitude;
+
+
+/* =========================
+   МАРКЕР
+========================= */
 
     marker.setLatLng([
       lat,
       lon
     ]);
 
+
+/* =========================
+   ЦЕНТРИРОВАНИЕ
+========================= */
 
     if (firstUpdate) {
 
@@ -270,45 +361,101 @@ async function updateCar() {
     }
 
 
-    /* СКОРОСТЬ */
+/* =========================
+   СКОРОСТЬ
+========================= */
 
-    if (typeof data.speed === "number") {
+    if (
+      typeof data.speed === "number"
+    ) {
 
-      document.getElementById("speed").textContent =
+      document
+        .getElementById("speed")
+        .textContent =
         Math.round(data.speed);
 
     } else {
 
-      document.getElementById("speed").textContent =
+      document
+        .getElementById("speed")
+        .textContent =
         "---";
 
     }
 
 
-    /* ТОЧНОСТЬ */
+/* =========================
+   ТОЧНОСТЬ
+========================= */
 
-    document.getElementById("accuracy").textContent =
+    document
+      .getElementById("accuracy")
+      .textContent =
       data.accuracy ?? "---";
 
 
-    /* СТАТУС */
-
-    document.getElementById("status").textContent =
-      "Автомобиль онлайн";
-
-
-    /* ВРЕМЯ */
+/* =========================
+   ОНЛАЙН / ОФЛАЙН
+========================= */
 
     if (data.timestamp) {
 
-      document.getElementById("time").textContent =
+      const age =
+        Date.now() -
+        data.timestamp;
+
+
+      /*
+        Если последняя GPS точка
+        получена не более
+        30 секунд назад
+      */
+
+      if (age <= 30000) {
+
+        document
+          .getElementById("status")
+          .textContent =
+          "Автомобиль онлайн";
+
+      } else {
+
+        document
+          .getElementById("status")
+          .textContent =
+          "Автомобиль офлайн";
+
+      }
+
+    } else {
+
+      document
+        .getElementById("status")
+        .textContent =
+        "Автомобиль офлайн";
+
+    }
+
+
+/* =========================
+   ВРЕМЯ ПОСЛЕДНЕЙ ТОЧКИ
+========================= */
+
+    if (data.timestamp) {
+
+      document
+        .getElementById("time")
+        .textContent =
+
         new Date(
           data.timestamp
         ).toLocaleTimeString();
 
     } else {
 
-      document.getElementById("time").textContent =
+      document
+        .getElementById("time")
+        .textContent =
         "---";
 
     }
@@ -316,7 +463,9 @@ async function updateCar() {
 
   } catch (error) {
 
-    document.getElementById("status").textContent =
+    document
+      .getElementById("status")
+      .textContent =
       "Ошибка подключения";
 
   }
@@ -324,17 +473,21 @@ async function updateCar() {
 }
 
 
-/* ЗАПУСК */
+/* =========================
+   ЗАПУСК
+========================= */
 
 updateCar();
 
 
-/* ОБНОВЛЯЕМ ТОЛЬКО МАШИНУ */
+/* Проверяем Firebase
+   каждые 3 секунды */
 
 setInterval(
   updateCar,
   3000
 );
+
 
 </script>
 
