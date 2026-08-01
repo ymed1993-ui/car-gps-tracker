@@ -33,44 +33,88 @@
 
 <script>
 
+const FIREBASE_URL =
+  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
+
+async function sendToFirebase(lat, lon, accuracy) {
+
+  const data = {
+    latitude: lat,
+    longitude: lon,
+    accuracy: Math.round(accuracy),
+    timestamp: Date.now()
+  };
+
+  try {
+
+    const response = await fetch(FIREBASE_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error("Firebase: " + response.status);
+    }
+
+    document.getElementById("status").textContent =
+      "GPS работает • координаты отправлены";
+
+  } catch (error) {
+
+    document.getElementById("status").textContent =
+      "GPS работает • ошибка отправки: " + error.message;
+  }
+}
+
+
 function updatePosition(position) {
 
-    document.getElementById("lat").textContent =
-        position.coords.latitude;
+  const lat = position.coords.latitude;
+  const lon = position.coords.longitude;
+  const accuracy = position.coords.accuracy;
 
-    document.getElementById("lon").textContent =
-        position.coords.longitude;
+  document.getElementById("lat").textContent = lat;
+  document.getElementById("lon").textContent = lon;
 
-    document.getElementById("accuracy").textContent =
-        Math.round(position.coords.accuracy);
+  document.getElementById("accuracy").textContent =
+    Math.round(accuracy);
 
-    document.getElementById("time").textContent =
-        new Date().toLocaleTimeString();
+  document.getElementById("time").textContent =
+    new Date().toLocaleTimeString();
 
-    document.getElementById("status").textContent =
-        "GPS работает";
+  document.getElementById("status").textContent =
+    "GPS работает • отправка...";
+
+  sendToFirebase(lat, lon, accuracy);
 }
+
 
 function gpsError(error) {
-    document.getElementById("status").textContent =
-        "Ошибка GPS: " + error.message;
+
+  document.getElementById("status").textContent =
+    "Ошибка GPS: " + error.message;
 }
+
 
 if ("geolocation" in navigator) {
 
-    navigator.geolocation.watchPosition(
-        updatePosition,
-        gpsError,
-        {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 20000
-        }
-    );
+  navigator.geolocation.watchPosition(
+    updatePosition,
+    gpsError,
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    }
+  );
 
 } else {
-    document.getElementById("status").textContent =
-        "Браузер не поддерживает GPS";
+
+  document.getElementById("status").textContent =
+    "Браузер не поддерживает GPS";
 }
 
 </script>
