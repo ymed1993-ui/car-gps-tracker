@@ -28,7 +28,7 @@
 
     #map {
       width: 100%;
-      height: calc(100vh - 105px);
+      height: calc(100vh - 125px);
     }
   </style>
 </head>
@@ -38,6 +38,7 @@
 <div id="info">
   <b>GPS автомобиля</b><br>
   Статус: <span id="status">Ожидание данных...</span><br>
+  Скорость: <span id="speed">---</span> км/ч<br>
   Точность: <span id="accuracy">---</span> м<br>
   Обновлено: <span id="time">---</span>
 </div>
@@ -123,11 +124,34 @@ async function updateCar() {
 
     }
 
+    /* СКОРОСТЬ */
+
+    if (typeof data.speed === "number") {
+
+      document.getElementById("speed").textContent =
+        Math.round(data.speed);
+
+    } else {
+
+      document.getElementById("speed").textContent =
+        "---";
+
+    }
+
+
+    /* ТОЧНОСТЬ */
+
     document.getElementById("accuracy").textContent =
       data.accuracy ?? "---";
 
+
+    /* СТАТУС */
+
     document.getElementById("status").textContent =
       "Автомобиль онлайн";
+
+
+    /* ВРЕМЯ */
 
     if (data.timestamp) {
 
@@ -137,7 +161,7 @@ async function updateCar() {
     } else {
 
       document.getElementById("time").textContent =
-        new Date().toLocaleTimeString();
+        "---";
 
     }
 
@@ -151,7 +175,8 @@ async function updateCar() {
 
 updateCar();
 
-/* Проверяем новые координаты каждые 3 секунды */
+/* Проверяем координаты каждые 3 секунды */
+
 setInterval(updateCar, 3000);
 
 </script>
