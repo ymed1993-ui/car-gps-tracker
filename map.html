@@ -1,857 +1,190 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <title>Карта автомобиля</title>
-
+  <title>GPS автомобиля</title>
 
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   >
 
-
   <style>
-
-    html,
-    body {
-
+    html, body {
       margin: 0;
       width: 100%;
       height: 100%;
-
       font-family: Arial, sans-serif;
     }
 
-
     #info {
-
       padding: 10px 15px;
-
       font-size: 18px;
-
-      box-sizing: border-box;
-
       background: white;
     }
 
-
     #status {
-
       font-weight: bold;
     }
 
-
     #map {
-
       width: 100%;
-
-      height: calc(100vh - 145px);
-
-      min-height: 400px;
+      height: calc(100vh - 120px);
     }
-
   </style>
-
 </head>
-
 
 <body>
 
-
 <div id="info">
-
-  <b>GPS автомобиля</b>
-
-  <br>
-
+  <b>GPS автомобиля</b><br>
 
   Статус:
-
-  <span id="status">
-    Ожидание данных...
-  </span>
-
-  <br>
-
+  <span id="status">Ожидание...</span><br>
 
   Скорость:
-
-  <span id="speed">
-    ---
-  </span>
-
-  км/ч
-
-  <br>
-
+  <span id="speed">---</span> км/ч<br>
 
   Точность:
-
-  <span id="accuracy">
-    ---
-  </span>
-
-  м
-
-  <br>
-
+  <span id="accuracy">---</span> м<br>
 
   Обновлено:
-
-  <span id="time">
-    ---
-  </span>
-
+  <span id="time">---</span>
 </div>
-
 
 <div id="map"></div>
 
-
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-</script>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
 
-
-/* =====================================================
-   FIREBASE
-===================================================== */
-
-
-const FIREBASE_URL =
+const URL =
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
 
-
-
-/* =====================================================
-   КАРТА
-===================================================== */
-
-
-const map =
-  L.map("map").setView(
-    [38.54645, 68.91205],
-    16
-  );
-
+const map = L.map("map").setView([38.54645, 68.91205], 16);
 
 L.tileLayer(
-
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-
   {
-
     maxZoom: 19,
-
-    attribution:
-      "© OpenStreetMap"
-
+    attribution: "© OpenStreetMap"
   }
-
 ).addTo(map);
 
+const marker = L.marker([38.54645, 68.91205]).addTo(map);
+
+let first = true;
+let animation;
 
 
-/* =====================================================
-   МАРКЕР АВТОМОБИЛЯ
-===================================================== */
+/* ПЛАВНОЕ ДВИЖЕНИЕ */
 
+function moveMarker(lat, lon) {
 
-const marker =
-  L.marker(
-    [38.54645, 68.91205]
-  ).addTo(map);
-
-
-
-/* =====================================================
-   ПЛАВНОЕ ДВИЖЕНИЕ МАРКЕРА
-===================================================== */
-
-
-let animationFrame = null;
-
-
-let displayedLat = null;
-
-let displayedLon = null;
-
-
-
-function animateMarker(
-
-  targetLat,
-
-  targetLon,
-
-  duration = 2800
-
-) {
-
-
-  /* -------------------------------------------------
-     ПЕРВАЯ КООРДИНАТА
-  ------------------------------------------------- */
-
-
-  if (
-
-    displayedLat === null ||
-
-    displayedLon === null
-
-  ) {
-
-
-    displayedLat =
-      targetLat;
-
-
-    displayedLon =
-      targetLon;
-
-
-    marker.setLatLng([
-
-      targetLat,
-
-      targetLon
-
-    ]);
-
-
-    return;
+  if (animation) {
+    cancelAnimationFrame(animation);
   }
 
+  const start = marker.getLatLng();
 
+  const startTime = performance.now();
 
-  /* -------------------------------------------------
-     ОСТАНАВЛИВАЕМ ПРЕДЫДУЩУЮ АНИМАЦИЮ
-  ------------------------------------------------- */
+  function move(now) {
 
+    const p =
+      Math.min((now - startTime) / 2800, 1);
 
-  if (
+    const newLat =
+      start.lat + (lat - start.lat) * p;
 
-    animationFrame !== null
+    const newLon =
+      start.lng + (lon - start.lng) * p;
 
-  ) {
+    marker.setLatLng([newLat, newLon]);
 
-
-    cancelAnimationFrame(
-
-      animationFrame
-
-    );
-
-
-    animationFrame = null;
-  }
-
-
-
-  /* -------------------------------------------------
-     ТЕКУЩЕЕ ПОЛОЖЕНИЕ МАРКЕРА
-  ------------------------------------------------- */
-
-
-  const current =
-    marker.getLatLng();
-
-
-  const startLat =
-    current.lat;
-
-
-  const startLon =
-    current.lng;
-
-
-
-  /* -------------------------------------------------
-     РАССТОЯНИЕ ДО НОВОЙ ТОЧКИ
-  ------------------------------------------------- */
-
-
-  const distance =
-
-    L.latLng(
-
-      startLat,
-
-      startLon
-
-    ).distanceTo(
-
-      L.latLng(
-
-        targetLat,
-
-        targetLon
-
-      )
-
-    );
-
-
-
-  /*
-     Если изменение меньше 0.5 метра,
-     просто устанавливаем координату.
-  */
-
-
-  if (
-
-    distance < 0.5
-
-  ) {
-
-
-    displayedLat =
-      targetLat;
-
-
-    displayedLon =
-      targetLon;
-
-
-    marker.setLatLng([
-
-      targetLat,
-
-      targetLon
-
-    ]);
-
-
-    return;
-  }
-
-
-
-  /* -------------------------------------------------
-     НАЧАЛО АНИМАЦИИ
-  ------------------------------------------------- */
-
-
-  const startTime =
-    performance.now();
-
-
-
-  function step(now) {
-
-
-    const elapsed =
-      now - startTime;
-
-
-    let progress =
-      elapsed / duration;
-
-
-
-    if (
-
-      progress > 1
-
-    ) {
-
-      progress = 1;
-
+    if (p < 1) {
+      animation = requestAnimationFrame(move);
     }
-
-
-
-    /*
-       Плавное начало и
-       плавное окончание движения.
-    */
-
-
-    const smooth =
-
-      progress *
-
-      progress *
-
-      (3 - 2 * progress);
-
-
-
-    const lat =
-
-      startLat +
-
-      (targetLat - startLat) *
-
-      smooth;
-
-
-
-    const lon =
-
-      startLon +
-
-      (targetLon - startLon) *
-
-      smooth;
-
-
-
-    marker.setLatLng([
-
-      lat,
-
-      lon
-
-    ]);
-
-
-
-    displayedLat =
-      lat;
-
-
-    displayedLon =
-      lon;
-
-
-
-    if (
-
-      progress < 1
-
-    ) {
-
-
-      animationFrame =
-
-        requestAnimationFrame(
-
-          step
-
-        );
-
-
-    } else {
-
-
-      displayedLat =
-        targetLat;
-
-
-      displayedLon =
-        targetLon;
-
-
-      animationFrame =
-        null;
-
-    }
-
   }
 
-
-
-  animationFrame =
-
-    requestAnimationFrame(
-
-      step
-
-    );
-
+  animation = requestAnimationFrame(move);
 }
 
 
+/* СТАТУС */
 
-/* =====================================================
-   ПЕРВЫЙ ЗАПУСК
-===================================================== */
+function status(text, color) {
 
+  const el = document.getElementById("status");
 
-let firstUpdate = true;
-
-
-
-/* =====================================================
-   ЦВЕТ СТАТУСА
-===================================================== */
-
-
-function setStatus(
-
-  text,
-
-  color
-
-) {
-
-
-  const status =
-    document.getElementById(
-      "status"
-    );
-
-
-  status.textContent =
-    text;
-
-
-  status.style.color =
-    color;
-
+  el.textContent = text;
+  el.style.color = color;
 }
 
 
-
-/* =====================================================
-   ПОЛУЧАЕМ КООРДИНАТЫ ИЗ FIREBASE
-===================================================== */
-
+/* FIREBASE */
 
 async function updateCar() {
 
-
   try {
 
-
     const response =
-
-      await fetch(
-
-        FIREBASE_URL +
-
-        "?t=" +
-
-        Date.now(),
-
-        {
-
-          cache:
-            "no-store"
-
-        }
-
-      );
-
-
-
-    if (
-
-      !response.ok
-
-    ) {
-
-
-      throw new Error(
-
-        "Firebase error"
-
-      );
-
-    }
-
-
+      await fetch(URL + "?t=" + Date.now());
 
     const data =
-
       await response.json();
 
+    if (!data) return;
 
+    const lat = data.latitude;
+    const lon = data.longitude;
 
-    /* -------------------------------------------------
-       ПРОВЕРКА ДАННЫХ
-    ------------------------------------------------- */
+    moveMarker(lat, lon);
 
+    if (first) {
 
-    if (
+      marker.setLatLng([lat, lon]);
 
-      !data ||
+      map.setView([lat, lon], 17);
 
-      typeof data.latitude !==
-        "number" ||
-
-      typeof data.longitude !==
-        "number"
-
-    ) {
-
-
-      setStatus(
-
-        "Нет данных",
-
-        "red"
-
-      );
-
-
-      return;
-
+      first = false;
     }
 
+    document.getElementById("speed").textContent =
+      data.speed ?? "---";
 
+    document.getElementById("accuracy").textContent =
+      data.accuracy ?? "---";
 
-    const lat =
-      data.latitude;
-
-
-    const lon =
-      data.longitude;
-
-
-
-    /* -------------------------------------------------
-       ПЛАВНО ДВИГАЕМ АВТОМОБИЛЬ
-    ------------------------------------------------- */
-
-
-    animateMarker(
-
-      lat,
-
-      lon,
-
-      2800
-
-    );
-
-
-
-    /* -------------------------------------------------
-       ПЕРВЫЙ ЗАПУСК КАРТЫ
-    ------------------------------------------------- */
-
-
-    if (
-
-      firstUpdate
-
-    ) {
-
-
-      map.setView(
-
-        [lat, lon],
-
-        17
-
-      );
-
-
-      firstUpdate =
-        false;
-
-    }
-
-
-
-    /* -------------------------------------------------
-       СКОРОСТЬ
-    ------------------------------------------------- */
-
-
-    if (
-
-      typeof data.speed ===
-        "number"
-
-    ) {
-
-
-      document
-        .getElementById(
-          "speed"
-        )
-        .textContent =
-
-        Math.round(
-
-          data.speed
-
-        );
-
-
-    } else {
-
-
-      document
-        .getElementById(
-          "speed"
-        )
-        .textContent =
-        "---";
-
-    }
-
-
-
-    /* -------------------------------------------------
-       ТОЧНОСТЬ GPS
-    ------------------------------------------------- */
-
-
-    document
-      .getElementById(
-        "accuracy"
-      )
-      .textContent =
-
-      data.accuracy ??
-      "---";
-
-
-
-    /* -------------------------------------------------
-       ОНЛАЙН / ОФЛАЙН
-    ------------------------------------------------- */
-
-
-    if (
-
-      data.timestamp
-
-    ) {
-
+    if (data.timestamp) {
 
       const age =
+        Date.now() - data.timestamp;
 
-        Date.now() -
-
-        data.timestamp;
-
-
-
-      /*
-         Данные не старше 30 секунд
-         = автомобиль онлайн.
-      */
-
-
-      if (
-
-        age <= 30000
-
-      ) {
-
-
-        setStatus(
-
-          "Автомобиль онлайн",
-
-          "green"
-
-        );
-
-
+      if (age <= 30000) {
+        status("Автомобиль онлайн", "green");
       } else {
-
-
-        setStatus(
-
-          "Автомобиль офлайн",
-
-          "red"
-
-        );
-
+        status("Автомобиль офлайн", "red");
       }
 
-
-
-      /* -------------------------------------------------
-         ВРЕМЯ ПОСЛЕДНЕГО ОБНОВЛЕНИЯ
-      ------------------------------------------------- */
-
-
-      document
-        .getElementById(
-          "time"
-        )
-        .textContent =
-
-        new Date(
-
-          data.timestamp
-
-        ).toLocaleTimeString();
-
-
-    } else {
-
-
-      setStatus(
-
-        "Автомобиль офлайн",
-
-        "red"
-
-      );
-
-
-      document
-        .getElementById(
-          "time"
-        )
-        .textContent =
-        "---";
-
+      document.getElementById("time").textContent =
+        new Date(data.timestamp).toLocaleTimeString();
     }
 
+  } catch (e) {
 
-
-  } catch (error) {
-
-
-    setStatus(
-
-      "Ошибка подключения",
-
-      "red"
-
-    );
-
+    status("Ошибка подключения", "red");
   }
-
 }
-
-
-
-/* =====================================================
-   ЗАПУСК
-===================================================== */
 
 
 updateCar();
 
-
-
-setInterval(
-
-  updateCar,
-
-  3000
-
-);
-
+setInterval(updateCar, 3000);
 
 </script>
 
-
 </body>
-
 </html>
