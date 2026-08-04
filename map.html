@@ -5,14 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GPS автомобиля</title>
 
-<link rel="stylesheet"
-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
 html,body{margin:0;height:100%;font-family:Arial}
 #info{padding:10px 15px;font-size:18px}
 #status{font-weight:bold}
-#map{height:calc(100vh - 120px)}
+button{margin:5px 5px 0 0;padding:7px 12px;font-size:15px}
+#segments{margin-top:5px}
+#map{height:calc(100vh - 170px)}
 </style>
 </head>
 
@@ -23,7 +24,12 @@ html,body{margin:0;height:100%;font-family:Arial}
 Статус: <span id="status">Ожидание...</span><br>
 Скорость: <span id="speed">---</span> км/ч<br>
 Точность: <span id="accuracy">---</span> м<br>
-Обновлено: <span id="time">---</span>
+Обновлено: <span id="time">---</span><br>
+
+<button onclick="historyLoad()">История</button>
+<button onclick="historyHide()">Скрыть</button>
+
+<div id="segments"></div>
 </div>
 
 <div id="map"></div>
@@ -32,8 +38,7 @@ html,body{margin:0;height:100%;font-family:Arial}
 
 <script>
 
-const url="https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
-
+const base="https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com";
 const map=L.map("map").setView([38.54645,68.91205],16);
 
 L.tileLayer(
@@ -43,74 +48,169 @@ L.tileLayer(
 
 const marker=L.marker([38.54645,68.91205]).addTo(map);
 
-let first=true;
-let animation;
+let first=true,animation,route;
+
+
+/* ПЛАВНОЕ ДВИЖЕНИЕ */
 
 function move(lat,lon){
 
-  if(animation) cancelAnimationFrame(animation);
+ if(animation) cancelAnimationFrame(animation);
 
-  const start=marker.getLatLng();
-  const time=performance.now();
+ const s=marker.getLatLng(),t=performance.now();
 
-  function step(now){
+ function step(n){
+  const p=Math.min((n-t)/1800,1);
 
-    const p=Math.min((now-time)/1800,1);
+  marker.setLatLng([
+   s.lat+(lat-s.lat)*p,
+   s.lng+(lon-s.lng)*p
+  ]);
 
-    marker.setLatLng([
-      start.lat+(lat-start.lat)*p,
-      start.lng+(lon-start.lng)*p
-    ]);
+  if(p<1) animation=requestAnimationFrame(step);
+ }
 
-    if(p<1)
-      animation=requestAnimationFrame(step);
-  }
-
-  animation=requestAnimationFrame(step);
+ animation=requestAnimationFrame(step);
 }
+
+
+/* ONLINE */
 
 function status(text,color){
-  const s=document.getElementById("status");
-  s.textContent=text;
-  s.style.color=color;
+ const s=document.getElementById("status");
+ s.textContent=text;
+ s.style.color=color;
 }
+
+
+/* ТЕКУЩАЯ КООРДИНАТА */
 
 async function update(){
 
-  try{
+ try{
 
-    const r=await fetch(url+"?t="+Date.now(),{cache:"no-store"});
-    const d=await r.json();
+  const r=await fetch(base+"/location.json?t="+Date.now(),{cache:"no-store"});
+  const d=await r.json();
 
-    if(!d) return;
+  if(!d) return;
 
-    const online=
-      d.online === true &&
-      Date.now()-d.timestamp < 5000;
+  const online=d.online===true && Date.now()-d.timestamp<5000;
 
-    status(
-      online ? "Автомобиль онлайн" : "Автомобиль офлайн",
-      online ? "green" : "red"
-    );
+  status(
+   online?"Автомобиль онлайн":"Автомобиль офлайн",
+   online?"green":"red"
+  );
 
-    if(first){
-      marker.setLatLng([d.latitude,d.longitude]);
-      map.setView([d.latitude,d.longitude],17);
-      first=false;
-    }else{
-      move(d.latitude,d.longitude);
-    }
-
-    speed.textContent=d.speed ?? "---";
-    accuracy.textContent=d.accuracy ?? "---";
-
-    if(d.timestamp)
-      time.textContent=new Date(d.timestamp).toLocaleTimeString();
-
-  }catch(e){
-    status("Ошибка подключения","red");
+  if(first){
+   marker.setLatLng([d.latitude,d.longitude]);
+   map.setView([d.latitude,d.longitude],17);
+   first=false;
+  }else{
+   move(d.latitude,d.longitude);
   }
+
+  speed.textContent=d.speed??"---";
+  accuracy.textContent=d.accuracy??"---";
+
+  if(d.timestamp)
+   time.textContent=new Date(d.timestamp).toLocaleTimeString();
+
+ }catch(e){
+  status("Ошибка подключения","red");
+ }
 }
+
+
+/* ИСТОРИЯ */
+
+async function historyLoad(){
+
+ const box=document.getElementById("segments");
+ box.innerHTML="Загрузка...";
+
+ try{
+
+  const r=await fetch(base+"/history.json?t="+Date.now());
+  const data=await r.json();
+
+  box.innerHTML="";
+
+  if(!data){
+   box.textContent="Истории пока нет";
+   return;
+  }
+
+  Object.keys(data)
+   .sort((a,b)=>b-a)
+   .forEach(id=>{
+
+    const start=new Date(Number(id));
+    const end=new Date(Number(id)+1800000);
+
+    const name=
+     start.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+
+     "–"+
+     end.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+
+    const b=document.createElement("button");
+
+    b.textContent=name;
+    b.onclick=()=>showRoute(id);
+
+    box.appendChild(b);
+   });
+
+ }catch(e){
+  box.textContent="Ошибка истории";
+ }
+}
+
+
+/* ПОКАЗАТЬ МАРШРУТ */
+
+async function showRoute(id){
+
+ try{
+
+  const r=await fetch(
+   base+"/history/"+id+"/points.json?t="+Date.now()
+  );
+
+  const data=await r.json();
+
+  if(!data) return;
+
+  const points=
+   Object.values(data)
+    .sort((a,b)=>a.timestamp-b.timestamp)
+    .map(p=>[p.latitude,p.longitude]);
+
+  if(route) map.removeLayer(route);
+
+  route=L.polyline(points,{
+   color:"blue",
+   weight:5
+  }).addTo(map);
+
+  if(points.length>1)
+   map.fitBounds(route.getBounds(),{padding:[30,30]});
+
+ }catch(e){}
+}
+
+
+/* СКРЫТЬ ИСТОРИЮ */
+
+function historyHide(){
+
+ document.getElementById("segments").innerHTML="";
+
+ if(route){
+  map.removeLayer(route);
+  route=null;
+ }
+}
+
 
 update();
 setInterval(update,2000);
