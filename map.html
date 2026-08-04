@@ -1,279 +1,120 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GPS автомобиля</title>
 
-  <title>GPS автомобиля</title>
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
-  <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      font-family: Arial, sans-serif;
-    }
-
-    #info {
-      padding: 10px 15px;
-      font-size: 18px;
-      background: white;
-    }
-
-    #status {
-      font-weight: bold;
-    }
-
-    #map {
-      width: 100%;
-      height: calc(100vh - 120px);
-    }
-  </style>
+<style>
+html,body{margin:0;height:100%;font-family:Arial}
+#info{padding:10px 15px;font-size:18px}
+#status{font-weight:bold}
+#map{height:calc(100vh - 120px)}
+</style>
 </head>
 
 <body>
 
 <div id="info">
-
-  <b>GPS автомобиля</b><br>
-
-  Статус:
-  <span id="status">Ожидание...</span><br>
-
-  Скорость:
-  <span id="speed">---</span> км/ч<br>
-
-  Точность:
-  <span id="accuracy">---</span> м<br>
-
-  Обновлено:
-  <span id="time">---</span>
-
+<b>GPS автомобиля</b><br>
+Статус: <span id="status">Ожидание...</span><br>
+Скорость: <span id="speed">---</span> км/ч<br>
+Точность: <span id="accuracy">---</span> м<br>
+Обновлено: <span id="time">---</span>
 </div>
 
 <div id="map"></div>
-
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
 
-const URL =
-  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
+const url="https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
 
-
-const map =
-  L.map("map").setView(
-    [38.54645, 68.91205],
-    16
-  );
-
+const map=L.map("map").setView([38.54645,68.91205],16);
 
 L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap"
-  }
+"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+{maxZoom:19}
 ).addTo(map);
 
+const marker=L.marker([38.54645,68.91205]).addTo(map);
 
-const marker =
-  L.marker([38.54645, 68.91205])
-    .addTo(map);
+let first=true;
+let animation;
 
+function move(lat,lon){
 
-let first = true;
-let animation = null;
-let lastTimestamp = null;
+  if(animation) cancelAnimationFrame(animation);
 
+  const start=marker.getLatLng();
+  const time=performance.now();
 
-/* ПЛАВНОЕ ДВИЖЕНИЕ */
+  function step(now){
 
-function moveMarker(lat, lon) {
-
-  if (animation) {
-    cancelAnimationFrame(animation);
-  }
-
-  const start =
-    marker.getLatLng();
-
-  const startTime =
-    performance.now();
-
-  function move(now) {
-
-    const p =
-      Math.min(
-        (now - startTime) / 900,
-        1
-      );
-
-    const newLat =
-      start.lat +
-      (lat - start.lat) * p;
-
-    const newLon =
-      start.lng +
-      (lon - start.lng) * p;
+    const p=Math.min((now-time)/1800,1);
 
     marker.setLatLng([
-      newLat,
-      newLon
+      start.lat+(lat-start.lat)*p,
+      start.lng+(lon-start.lng)*p
     ]);
 
-    if (p < 1) {
-      animation =
-        requestAnimationFrame(move);
-    }
+    if(p<1)
+      animation=requestAnimationFrame(step);
   }
 
-  animation =
-    requestAnimationFrame(move);
+  animation=requestAnimationFrame(step);
 }
 
-
-/* СТАТУС */
-
-function setStatus(text, color) {
-
-  const status =
-    document.getElementById("status");
-
-  status.textContent = text;
-  status.style.color = color;
+function status(text,color){
+  const s=document.getElementById("status");
+  s.textContent=text;
+  s.style.color=color;
 }
 
+async function update(){
 
-/* FIREBASE */
+  try{
 
-async function updateCar() {
+    const r=await fetch(url+"?t="+Date.now(),{cache:"no-store"});
+    const d=await r.json();
 
-  try {
+    if(!d) return;
 
-    const response =
-      await fetch(
-        URL + "?t=" + Date.now(),
-        {
-          cache: "no-store"
-        }
-      );
+    const online=
+      d.online === true &&
+      Date.now()-d.timestamp < 5000;
 
-    const data =
-      await response.json();
-
-
-    if (!data) {
-      return;
-    }
-
-
-    /* ONLINE / OFFLINE */
-
-    if (data.online === true) {
-
-      setStatus(
-        "Автомобиль онлайн",
-        "green"
-      );
-
-    } else {
-
-      setStatus(
-        "Автомобиль офлайн",
-        "red"
-      );
-    }
-
-
-    /* КООРДИНАТЫ */
-
-    if (
-      typeof data.latitude === "number" &&
-      typeof data.longitude === "number"
-    ) {
-
-      if (first) {
-
-        marker.setLatLng([
-          data.latitude,
-          data.longitude
-        ]);
-
-        map.setView([
-          data.latitude,
-          data.longitude
-        ], 17);
-
-        first = false;
-
-      } else if (
-        data.timestamp !== lastTimestamp
-      ) {
-
-        moveMarker(
-          data.latitude,
-          data.longitude
-        );
-      }
-    }
-
-
-    lastTimestamp =
-      data.timestamp;
-
-
-    /* СКОРОСТЬ */
-
-    document.getElementById("speed")
-      .textContent =
-      data.speed ?? "---";
-
-
-    /* ТОЧНОСТЬ */
-
-    document.getElementById("accuracy")
-      .textContent =
-      data.accuracy ?? "---";
-
-
-    /* ВРЕМЯ */
-
-    if (data.timestamp) {
-
-      document.getElementById("time")
-        .textContent =
-        new Date(
-          data.timestamp
-        ).toLocaleTimeString();
-    }
-
-
-  } catch (e) {
-
-    setStatus(
-      "Ошибка подключения",
-      "red"
+    status(
+      online ? "Автомобиль онлайн" : "Автомобиль офлайн",
+      online ? "green" : "red"
     );
+
+    if(first){
+      marker.setLatLng([d.latitude,d.longitude]);
+      map.setView([d.latitude,d.longitude],17);
+      first=false;
+    }else{
+      move(d.latitude,d.longitude);
+    }
+
+    speed.textContent=d.speed ?? "---";
+    accuracy.textContent=d.accuracy ?? "---";
+
+    if(d.timestamp)
+      time.textContent=new Date(d.timestamp).toLocaleTimeString();
+
+  }catch(e){
+    status("Ошибка подключения","red");
   }
 }
 
-
-updateCar();
-
-/* Проверяем Firebase каждую 1 секунду */
-
-setInterval(
-  updateCar,
-  1000
-);
+update();
+setInterval(update,2000);
 
 </script>
-
 </body>
 </html>
