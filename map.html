@@ -1,643 +1,292 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Карта автомобиля</title>
-
 
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   >
 
-
   <style>
-
-    html,
-    body {
-
+    html, body {
       margin: 0;
-
       width: 100%;
-
       height: 100%;
-
-      font-family:
-        Arial,
-        sans-serif;
+      font-family: Arial, sans-serif;
     }
-
 
     #info {
-
-      padding:
-        10px 15px;
-
-      font-size:
-        18px;
-
-      box-sizing:
-        border-box;
-
-      background:
-        white;
+      padding: 10px 15px;
+      font-size: 18px;
+      box-sizing: border-box;
+      background: white;
     }
-
 
     #buttons {
-
-      margin-top:
-        8px;
+      margin-top: 8px;
     }
-
 
     button {
-
-      font-size:
-        16px;
-
-      padding:
-        7px 12px;
-
-      margin:
-        3px;
-
-      cursor:
-        pointer;
+      font-size: 16px;
+      padding: 7px 12px;
+      margin: 3px;
+      cursor: pointer;
     }
-
 
     #segments {
-
-      margin-top:
-        8px;
+      margin-top: 8px;
     }
-
 
     #segments button {
-
-      background:
-        #f2f2f2;
-
-      border:
-        1px solid #999;
-
-      border-radius:
-        4px;
+      background: #f2f2f2;
+      border: 1px solid #999;
+      border-radius: 4px;
     }
-
 
     #map {
-
-      width:
-        100%;
-
-      height:
-        calc(100vh - 220px);
-
-      min-height:
-        400px;
+      width: 100%;
+      height: calc(100vh - 220px);
+      min-height: 400px;
     }
-
   </style>
-
 </head>
-
 
 <body>
 
-
 <div id="info">
 
-
-  <b>
-    GPS автомобиля
-  </b>
-
-  <br>
-
+  <b>GPS автомобиля</b><br>
 
   Статус:
-
-  <span id="status">
-    Ожидание данных...
-  </span>
-
+  <span id="status">Ожидание данных...</span>
   <br>
-
 
   Скорость:
-
-  <span id="speed">
-    ---
-  </span>
-
-  км/ч
-
+  <span id="speed">---</span> км/ч
   <br>
-
 
   Точность:
-
-  <span id="accuracy">
-    ---
-  </span>
-
-  м
-
+  <span id="accuracy">---</span> м
   <br>
 
-
   Обновлено:
-
-  <span id="time">
-    ---
-  </span>
-
+  <span id="time">---</span>
 
   <div id="buttons">
 
-
-    <button
-      onclick="loadSegments()"
-    >
-
+    <button onclick="loadSegments()">
       История
-
     </button>
 
-
-    <button
-      onclick="hideHistory()"
-    >
-
+    <button onclick="hideHistory()">
       Скрыть
-
     </button>
 
-
   </div>
 
-
-  <div id="segments">
-  </div>
-
+  <div id="segments"></div>
 
 </div>
 
 
-
-<div id="map">
-</div>
+<div id="map"></div>
 
 
-
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-></script>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 
 <script>
 
-
-/* =========================================================
+/* =========================
    FIREBASE
-========================================================= */
-
+========================= */
 
 const FIREBASE_BASE =
-
   "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com";
 
-
 const FIREBASE_URL =
-
-  FIREBASE_BASE +
-  "/location.json";
-
+  FIREBASE_BASE + "/location.json";
 
 const HISTORY_URL =
-
-  FIREBASE_BASE +
-  "/history.json";
+  FIREBASE_BASE + "/history.json";
 
 
-
-/* =========================================================
+/* =========================
    КАРТА
-========================================================= */
+========================= */
 
-
-const map =
-
-  L.map(
-    "map"
-  )
-  .setView(
-
-    [
-      38.54645,
-      68.91205
-    ],
-
-    16
-
-  );
-
-
-
-L.tileLayer(
-
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-
-  {
-
-    maxZoom:
-      19,
-
-    attribution:
-      "© OpenStreetMap"
-
-  }
-
-).addTo(
-  map
+const map = L.map("map").setView(
+  [38.54645, 68.91205],
+  16
 );
 
 
-
-/* =========================================================
-   МАРКЕР АВТОМОБИЛЯ
-========================================================= */
-
-
-const marker =
-
-  L.marker(
-
-    [
-      38.54645,
-      68.91205
-    ]
-
-  )
-  .addTo(
-    map
-  );
+L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }
+).addTo(map);
 
 
+/* =========================
+   МАРКЕР
+========================= */
 
-/* =========================================================
-   ЛИНИЯ ИСТОРИИ
-========================================================= */
-
-
-const routeLine =
-
-  L.polyline(
-
-    [],
-
-    {
-
-      color:
-        "blue",
-
-      weight:
-        5,
-
-      opacity:
-        0.8
-
-    }
-
-  );
+const marker = L.marker(
+  [38.54645, 68.91205]
+).addTo(map);
 
 
+/* =========================
+   ЛИНИЯ МАРШРУТА
+========================= */
 
-let firstUpdate =
-  true;
-
-
-
-/* =========================================================
-   ВРЕМЯ ТАДЖИКИСТАНА
-========================================================= */
-
-
-function formatTime(
-  timestamp
-) {
+const routeLine = L.polyline([], {
+  color: "blue",
+  weight: 5,
+  opacity: 0.8
+});
 
 
-  return new Date(
-
-    Number(
-      timestamp
-    )
-
-  )
-  .toLocaleTimeString(
-
-    "ru-RU",
-
-    {
-
-      timeZone:
-        "Asia/Dushanbe",
-
-      hour:
-        "2-digit",
-
-      minute:
-        "2-digit",
-
-      hour12:
-        false
-
-    }
-
-  );
-
-}
+let firstUpdate = true;
 
 
-
-/* =========================================================
-   НАЗВАНИЕ 30-МИНУТНОГО УЧАСТКА
-========================================================= */
-
-
-function formatSegmentName(
-  start,
-  end
-) {
-
-
-  return (
-
-    formatTime(
-      start
-    )
-
-    +
-
-    " - "
-
-    +
-
-    formatTime(
-      end
-    )
-
-  );
-
-}
-
-
-
-/* =========================================================
-   ЗАГРУЗКА СПИСКА ИСТОРИИ
-========================================================= */
-
+/* =========================
+   ЗАГРУЖАЕМ СПИСОК
+   30-МИНУТНЫХ УЧАСТКОВ
+========================= */
 
 async function loadSegments() {
 
-
   const container =
-
-    document.getElementById(
-      "segments"
-    );
-
+    document.getElementById("segments");
 
   container.innerHTML =
-
     "Загрузка истории...";
 
 
   try {
 
-
-    const response =
-
-      await fetch(
-
-        HISTORY_URL +
-
-        "?t=" +
-
-        Date.now(),
-
-        {
-
-          cache:
-            "no-store"
-
-        }
-
-      );
+    const response = await fetch(
+      HISTORY_URL +
+      "?t=" +
+      Date.now(),
+      {
+        cache: "no-store"
+      }
+    );
 
 
-
-    if (
-      !response.ok
-    ) {
-
+    if (!response.ok) {
 
       container.innerHTML =
-
         "Ошибка загрузки";
 
-
       return;
-
     }
-
 
 
     const history =
-
       await response.json();
 
 
-
-    if (
-      !history
-    ) {
-
+    if (!history) {
 
       container.innerHTML =
-
         "История пока пустая";
 
-
       return;
-
     }
 
 
-
-    const segments =
-      [];
-
+    const segments = [];
 
 
     for (
-
-      const [
-        segmentId,
-        segment
-      ]
-
-      of Object.entries(
-        history
-      )
-
+      const [segmentId, segment]
+      of Object.entries(history)
     ) {
 
+      /*
+        Новая история имеет:
+
+        history
+          segmentId
+            info
+            points
+      */
 
       if (
-
         segment &&
-
         segment.info &&
-
         segment.points
-
       ) {
 
-
-        segments.push(
-
-          {
-
-            id:
-              segmentId,
-
-            info:
-              segment.info,
-
-            points:
-              segment.points
-
-          }
-
-        );
+        segments.push({
+          id: segmentId,
+          info: segment.info,
+          points: segment.points
+        });
 
       }
 
     }
 
 
-
-    if (
-      segments.length === 0
-    ) {
-
+    if (segments.length === 0) {
 
       container.innerHTML =
-
         "Новых участков пока нет";
 
-
       return;
-
     }
 
 
-
-    /* Самые новые участки сверху */
-
+    /* Новые участки сверху */
 
     segments.sort(
-
-      (
-        a,
-        b
-      ) =>
-
-        Number(
-          b.info.start
-        )
-
-        -
-
-        Number(
-          a.info.start
-        )
-
+      (a, b) =>
+        Number(b.info.start) -
+        Number(a.info.start)
     );
 
 
-
-    container.innerHTML =
-      "";
+    container.innerHTML = "";
 
 
-
-    for (
-      const segment
-      of segments
-    ) {
-
+    for (const segment of segments) {
 
       const button =
-
-        document.createElement(
-          "button"
-        );
+        document.createElement("button");
 
 
-
-      /*
-       * ВАЖНО:
-       *
-       * Старое segment.info.name
-       * НЕ используем.
-       *
-       * Название всегда рассчитываем
-       * из timestamp по часовому поясу
-       * Душанбе.
-       */
-
+      /* Например:
+         01:30 - 02:00
+      */
 
       button.textContent =
-
+        segment.info.name ||
         formatSegmentName(
-
           segment.info.start,
-
           segment.info.end
-
         );
-
 
 
       button.onclick =
-
         function () {
 
-
           showSegment(
-
             segment.points,
-
             button
-
           );
 
         };
-
 
 
       container.appendChild(
@@ -647,177 +296,127 @@ async function loadSegments() {
     }
 
 
-
-  } catch (
-    error
-  ) {
-
+  } catch (error) {
 
     container.innerHTML =
-
       "Ошибка загрузки истории";
 
-
-    console.log(
-      error
-    );
+    console.log(error);
 
   }
 
 }
 
 
+/* =========================
+   ФОРМАТ ВРЕМЕНИ
+========================= */
 
-/* =========================================================
-   ПОКАЗАТЬ ВЫБРАННЫЙ УЧАСТОК
-========================================================= */
+function formatTime(timestamp) {
+
+  return new Date(
+    timestamp
+  ).toLocaleTimeString(
+    [],
+    {
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
+
+}
 
 
-function showSegment(
-
-  pointsObject,
-
-  selectedButton
-
+function formatSegmentName(
+  start,
+  end
 ) {
 
+  return (
+    formatTime(start) +
+    " - " +
+    formatTime(end)
+  );
 
-  if (
-    !pointsObject
-  ) {
+}
 
+
+/* =========================
+   ПОКАЗАТЬ ОДИН УЧАСТОК
+========================= */
+
+function showSegment(
+  pointsObject,
+  selectedButton
+) {
+
+  if (!pointsObject) {
     return;
-
   }
 
 
-
   const data =
+    Object.values(pointsObject)
 
-    Object.values(
-      pointsObject
-    )
-
-
-    .filter(
-
-      item =>
-
+      .filter(item =>
 
         item &&
 
+        typeof item.latitude === "number" &&
 
-        typeof item.latitude ===
-          "number" &&
+        typeof item.longitude === "number" &&
 
-
-        typeof item.longitude ===
-          "number" &&
-
-
-        typeof item.timestamp ===
-          "number" &&
-
+        typeof item.timestamp === "number" &&
 
         (
-
-          typeof item.accuracy !==
-            "number"
-
-          ||
-
-          item.accuracy <=
-            50
-
+          typeof item.accuracy !== "number" ||
+          item.accuracy <= 50
         )
 
-    )
+      )
 
-
-    .sort(
-
-      (
-        a,
-        b
-      ) =>
-
-        a.timestamp -
-        b.timestamp
-
-    );
-
-
-
-  const points =
-    [];
-
-
-  let previousPoint =
-    null;
-
-
-
-  for (
-    const item
-    of data
-  ) {
-
-
-    const currentPoint =
-
-      L.latLng(
-
-        item.latitude,
-
-        item.longitude
-
+      .sort(
+        (a, b) =>
+          a.timestamp -
+          b.timestamp
       );
 
 
+  const points = [];
 
-    if (
-      previousPoint
-    ) {
+  let previousPoint = null;
 
+
+  for (const item of data) {
+
+    const currentPoint =
+      L.latLng(
+        item.latitude,
+        item.longitude
+      );
+
+
+    if (previousPoint) {
 
       const distance =
-
         previousPoint.distanceTo(
           currentPoint
         );
 
 
+      /* Убираем сильный GPS-скачок */
 
-      /*
-       * Убираем сильные
-       * ошибочные скачки GPS.
-       */
-
-
-      if (
-        distance > 300
-      ) {
-
+      if (distance > 300) {
         continue;
-
       }
 
     }
 
 
-
-    points.push(
-
-      [
-
-        item.latitude,
-
-        item.longitude
-
-      ]
-
-    );
-
+    points.push([
+      item.latitude,
+      item.longitude
+    ]);
 
 
     previousPoint =
@@ -826,23 +425,14 @@ function showSegment(
   }
 
 
-
-  if (
-    points.length === 0
-  ) {
-
+  if (points.length === 0) {
 
     alert(
-
       "В этом участке нет точек маршрута"
-
     );
 
-
     return;
-
   }
-
 
 
   routeLine.setLatLngs(
@@ -850,94 +440,53 @@ function showSegment(
   );
 
 
+  if (!map.hasLayer(routeLine)) {
 
-  if (
-    !map.hasLayer(
-      routeLine
-    )
-  ) {
-
-
-    routeLine.addTo(
-      map
-    );
+    routeLine.addTo(map);
 
   }
 
 
-
   /* Выделяем выбранную кнопку */
 
-
   const buttons =
-
     document.querySelectorAll(
-
       "#segments button"
-
     );
 
 
+  buttons.forEach(button => {
 
-  buttons.forEach(
+    button.style.fontWeight =
+      "normal";
 
-    button => {
-
-
-      button.style.fontWeight =
-
-        "normal";
-
-    }
-
-  );
+  });
 
 
-
-  if (
-    selectedButton
-  ) {
-
+  if (selectedButton) {
 
     selectedButton.style.fontWeight =
-
       "bold";
 
   }
 
 
+  /* Показываем весь выбранный маршрут */
 
-  /* Показываем весь маршрут */
-
-
-  if (
-    points.length >= 2
-  ) {
-
+  if (points.length >= 2) {
 
     map.fitBounds(
-
       routeLine.getBounds(),
-
       {
-
-        padding:
-          [30, 30]
-
+        padding: [30, 30]
       }
-
     );
-
 
   } else {
 
-
     map.setView(
-
       points[0],
-
       17
-
     );
 
   }
@@ -945,23 +494,15 @@ function showSegment(
 }
 
 
-
-/* =========================================================
+/* =========================
    СКРЫТЬ ИСТОРИЮ
-========================================================= */
-
+========================= */
 
 function hideHistory() {
 
-
   if (
-
-    map.hasLayer(
-      routeLine
-    )
-
+    map.hasLayer(routeLine)
   ) {
-
 
     map.removeLayer(
       routeLine
@@ -970,54 +511,36 @@ function hideHistory() {
   }
 
 
-
   document
-    .getElementById(
-      "segments"
-    )
-    .innerHTML =
-    "";
+    .getElementById("segments")
+    .innerHTML = "";
 
 }
 
 
-
-/* =========================================================
+/* =========================
    ТЕКУЩАЯ ПОЗИЦИЯ
-========================================================= */
-
+========================= */
 
 async function updateCar() {
 
-
   try {
 
-
     const response =
-
       await fetch(
 
         FIREBASE_URL +
-
         "?t=" +
-
         Date.now(),
 
         {
-
-          cache:
-            "no-store"
-
+          cache: "no-store"
         }
 
       );
 
 
-
-    if (
-      !response.ok
-    ) {
-
+    if (!response.ok) {
 
       throw new Error(
         "Firebase error"
@@ -1026,15 +549,11 @@ async function updateCar() {
     }
 
 
-
     const data =
-
       await response.json();
 
 
-
     if (
-
       !data ||
 
       typeof data.latitude !==
@@ -1042,71 +561,41 @@ async function updateCar() {
 
       typeof data.longitude !==
         "number"
-
     ) {
 
-
       document
-        .getElementById(
-          "status"
-        )
+        .getElementById("status")
         .textContent =
-
         "Нет данных";
-
 
       return;
 
     }
 
 
-
     const lat =
       data.latitude;
-
 
     const lon =
       data.longitude;
 
 
+    /* МАРКЕР */
 
-    /* =====================================================
-       МАРКЕР
-    ===================================================== */
-
-
-    marker.setLatLng(
-
-      [
-        lat,
-        lon
-      ]
-
-    );
+    marker.setLatLng([
+      lat,
+      lon
+    ]);
 
 
+    /* ПЕРВЫЙ ЗАПУСК */
 
-    /* =====================================================
-       ПЕРВЫЙ ЗАПУСК
-    ===================================================== */
-
-
-    if (
-      firstUpdate
-    ) {
-
+    if (firstUpdate) {
 
       map.setView(
-
-        [
-          lat,
-          lon
-        ],
-
+        [lat, lon],
         17
-
       );
-
 
       firstUpdate =
         false;
@@ -1114,188 +603,98 @@ async function updateCar() {
     }
 
 
-
-    /* =====================================================
-       СКОРОСТЬ
-    ===================================================== */
-
+    /* СКОРОСТЬ */
 
     if (
-
       typeof data.speed ===
       "number"
-
     ) {
 
-
       document
-        .getElementById(
-          "speed"
-        )
+        .getElementById("speed")
         .textContent =
-
         Math.round(
           data.speed
         );
 
-
     } else {
 
-
       document
-        .getElementById(
-          "speed"
-        )
+        .getElementById("speed")
         .textContent =
-
         "---";
 
     }
 
 
-
-    /* =====================================================
-       ТОЧНОСТЬ
-    ===================================================== */
-
+    /* ТОЧНОСТЬ */
 
     document
-      .getElementById(
-        "accuracy"
-      )
+      .getElementById("accuracy")
       .textContent =
-
-      data.accuracy ??
-      "---";
+      data.accuracy ?? "---";
 
 
-
-    /* =====================================================
+    /* =====================
        ОНЛАЙН / ОФЛАЙН
-    ===================================================== */
+    ===================== */
 
-
-    if (
-      data.timestamp
-    ) {
-
+    if (data.timestamp) {
 
       const age =
-
         Date.now() -
-
         data.timestamp;
-
 
 
       if (
         age <= 30000
       ) {
 
-
         document
-          .getElementById(
-            "status"
-          )
+          .getElementById("status")
           .textContent =
-
           "Автомобиль онлайн";
-
 
       } else {
 
-
         document
-          .getElementById(
-            "status"
-          )
+          .getElementById("status")
           .textContent =
-
           "Автомобиль офлайн";
 
       }
 
 
-
-      /*
-       * Время последней точки
-       * тоже показываем
-       * по Душанбе.
-       */
-
-
       document
-        .getElementById(
-          "time"
-        )
+        .getElementById("time")
         .textContent =
 
         new Date(
-          Number(
-            data.timestamp
-          )
-        )
-        .toLocaleTimeString(
-
-          "ru-RU",
-
-          {
-
-            timeZone:
-              "Asia/Dushanbe",
-
-            hour:
-              "2-digit",
-
-            minute:
-              "2-digit",
-
-            second:
-              "2-digit",
-
-            hour12:
-              false
-
-          }
-
-        );
+          data.timestamp
+        ).toLocaleTimeString();
 
 
     } else {
 
-
       document
-        .getElementById(
-          "status"
-        )
+        .getElementById("status")
         .textContent =
-
         "Автомобиль офлайн";
 
 
       document
-        .getElementById(
-          "time"
-        )
+        .getElementById("time")
         .textContent =
-
         "---";
 
     }
 
 
-
-  } catch (
-    error
-  ) {
-
+  } catch (error) {
 
     document
-      .getElementById(
-        "status"
-      )
+      .getElementById("status")
       .textContent =
-
       "Ошибка подключения";
 
   }
@@ -1303,28 +702,20 @@ async function updateCar() {
 }
 
 
-
-/* =========================================================
+/* =========================
    ЗАПУСК
-========================================================= */
-
+========================= */
 
 updateCar();
 
 
-
 setInterval(
-
   updateCar,
-
   3000
-
 );
 
 
 </script>
 
-
 </body>
-
 </html>
