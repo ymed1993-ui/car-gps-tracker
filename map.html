@@ -1,94 +1,115 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
+
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
   <title>Карта автомобиля</title>
+
 
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   >
 
+
   <style>
-    html, body {
+
+    html,
+    body {
+
       margin: 0;
       width: 100%;
       height: 100%;
+
       font-family: Arial, sans-serif;
     }
 
+
     #info {
+
       padding: 10px 15px;
+
       font-size: 18px;
+
       box-sizing: border-box;
+
       background: white;
     }
 
-    #buttons {
-      margin-top: 8px;
+
+    #status {
+
+      font-weight: bold;
     }
 
-    button {
-      font-size: 16px;
-      padding: 7px 12px;
-      margin: 3px;
-      cursor: pointer;
-    }
-
-    #segments {
-      margin-top: 8px;
-    }
-
-    #segments button {
-      background: #f2f2f2;
-      border: 1px solid #999;
-      border-radius: 4px;
-    }
 
     #map {
+
       width: 100%;
-      height: calc(100vh - 220px);
+
+      height: calc(100vh - 145px);
+
       min-height: 400px;
     }
+
   </style>
+
 </head>
+
 
 <body>
 
+
 <div id="info">
 
-  <b>GPS автомобиля</b><br>
+  <b>GPS автомобиля</b>
+
+  <br>
+
 
   Статус:
-  <span id="status">Ожидание данных...</span>
+
+  <span id="status">
+    Ожидание данных...
+  </span>
+
   <br>
+
 
   Скорость:
-  <span id="speed">---</span> км/ч
+
+  <span id="speed">
+    ---
+  </span>
+
+  км/ч
+
   <br>
+
 
   Точность:
-  <span id="accuracy">---</span> м
+
+  <span id="accuracy">
+    ---
+  </span>
+
+  м
+
   <br>
 
+
   Обновлено:
-  <span id="time">---</span>
 
-  <div id="buttons">
-
-    <button onclick="loadSegments()">
-      История
-    </button>
-
-    <button onclick="hideHistory()">
-      Скрыть
-    </button>
-
-  </div>
-
-  <div id="segments"></div>
+  <span id="time">
+    ---
+  </span>
 
 </div>
 
@@ -96,161 +117,242 @@
 <div id="map"></div>
 
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
 
 
 <script>
 
-/* =========================
-   FIREBASE
-========================= */
 
-const FIREBASE_BASE =
-  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com";
+/* =====================================================
+   FIREBASE
+===================================================== */
+
 
 const FIREBASE_URL =
-  FIREBASE_BASE + "/location.json";
-
-const HISTORY_URL =
-  FIREBASE_BASE + "/history.json";
+  "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com/location.json";
 
 
-/* =========================
+
+/* =====================================================
    КАРТА
-========================= */
+===================================================== */
 
-const map = L.map("map").setView(
-  [38.54645, 68.91205],
-  16
-);
+
+const map =
+  L.map("map").setView(
+    [38.54645, 68.91205],
+    16
+  );
 
 
 L.tileLayer(
+
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+
   {
+
     maxZoom: 19,
-    attribution: "© OpenStreetMap"
+
+    attribution:
+      "© OpenStreetMap"
+
   }
+
 ).addTo(map);
 
 
-/* =========================
-   МАРКЕР
-========================= */
 
-const marker = L.marker(
-  [38.54645, 68.91205]
-).addTo(map);
+/* =====================================================
+   МАРКЕР АВТОМОБИЛЯ
+===================================================== */
 
 
-/* =========================
+const marker =
+  L.marker(
+    [38.54645, 68.91205]
+  ).addTo(map);
+
+
+
+/* =====================================================
    ПЛАВНОЕ ДВИЖЕНИЕ МАРКЕРА
-========================= */
+===================================================== */
+
 
 let animationFrame = null;
 
+
 let displayedLat = null;
+
 let displayedLon = null;
 
 
-/*
-  Плавно двигаем маркер
-  от текущей позиции
-  к новой GPS-точке.
-*/
+
 function animateMarker(
+
   targetLat,
+
   targetLon,
+
   duration = 2800
+
 ) {
 
-  /* Первая координата —
-     ставим сразу */
+
+  /* -------------------------------------------------
+     ПЕРВАЯ КООРДИНАТА
+  ------------------------------------------------- */
+
 
   if (
+
     displayedLat === null ||
+
     displayedLon === null
+
   ) {
 
-    displayedLat = targetLat;
-    displayedLon = targetLon;
+
+    displayedLat =
+      targetLat;
+
+
+    displayedLon =
+      targetLon;
+
 
     marker.setLatLng([
+
       targetLat,
+
       targetLon
+
     ]);
+
 
     return;
   }
 
 
-  /* Если предыдущая анимация
-     ещё идёт — прекращаем её */
 
-  if (animationFrame !== null) {
+  /* -------------------------------------------------
+     ОСТАНАВЛИВАЕМ ПРЕДЫДУЩУЮ АНИМАЦИЮ
+  ------------------------------------------------- */
+
+
+  if (
+
+    animationFrame !== null
+
+  ) {
+
 
     cancelAnimationFrame(
+
       animationFrame
+
     );
+
 
     animationFrame = null;
   }
 
 
-  /*
-    Начинаем именно с того места,
-    где маркер находится сейчас.
-  */
+
+  /* -------------------------------------------------
+     ТЕКУЩЕЕ ПОЛОЖЕНИЕ МАРКЕРА
+  ------------------------------------------------- */
+
 
   const current =
     marker.getLatLng();
 
+
   const startLat =
     current.lat;
+
 
   const startLon =
     current.lng;
 
 
-  /*
-    Если новая координата практически
-    такая же — ничего не анимируем.
-  */
+
+  /* -------------------------------------------------
+     РАССТОЯНИЕ ДО НОВОЙ ТОЧКИ
+  ------------------------------------------------- */
+
 
   const distance =
+
     L.latLng(
+
       startLat,
+
       startLon
+
     ).distanceTo(
+
       L.latLng(
+
         targetLat,
+
         targetLon
+
       )
+
     );
 
 
-  if (distance < 0.5) {
+
+  /*
+     Если изменение меньше 0.5 метра,
+     просто устанавливаем координату.
+  */
+
+
+  if (
+
+    distance < 0.5
+
+  ) {
+
 
     displayedLat =
       targetLat;
 
+
     displayedLon =
       targetLon;
 
+
     marker.setLatLng([
+
       targetLat,
+
       targetLon
+
     ]);
+
 
     return;
   }
+
+
+
+  /* -------------------------------------------------
+     НАЧАЛО АНИМАЦИИ
+  ------------------------------------------------- */
 
 
   const startTime =
     performance.now();
 
 
+
   function step(now) {
+
 
     const elapsed =
       now - startTime;
@@ -260,478 +362,224 @@ function animateMarker(
       elapsed / duration;
 
 
-    if (progress > 1) {
+
+    if (
+
+      progress > 1
+
+    ) {
 
       progress = 1;
+
     }
 
 
+
     /*
-      Плавное начало и окончание.
-      Маркер не дёргается резко.
+       Плавное начало и
+       плавное окончание движения.
     */
 
+
     const smooth =
-      progress * progress *
+
+      progress *
+
+      progress *
+
       (3 - 2 * progress);
 
 
+
     const lat =
+
       startLat +
+
       (targetLat - startLat) *
+
       smooth;
+
 
 
     const lon =
+
       startLon +
+
       (targetLon - startLon) *
+
       smooth;
 
 
+
     marker.setLatLng([
+
       lat,
+
       lon
+
     ]);
+
 
 
     displayedLat =
       lat;
 
+
     displayedLon =
       lon;
 
 
-    if (progress < 1) {
+
+    if (
+
+      progress < 1
+
+    ) {
+
 
       animationFrame =
+
         requestAnimationFrame(
+
           step
+
         );
 
+
     } else {
+
 
       displayedLat =
         targetLat;
 
+
       displayedLon =
         targetLon;
 
-      animationFrame = null;
+
+      animationFrame =
+        null;
 
     }
+
   }
 
 
+
   animationFrame =
+
     requestAnimationFrame(
+
       step
+
     );
+
 }
 
 
-/* =========================
-   ЛИНИЯ МАРШРУТА
-========================= */
 
-const routeLine = L.polyline([], {
-  color: "blue",
-  weight: 5,
-  opacity: 0.8
-});
+/* =====================================================
+   ПЕРВЫЙ ЗАПУСК
+===================================================== */
 
 
 let firstUpdate = true;
 
 
-/* =========================
-   ЗАГРУЖАЕМ СПИСОК
-   30-МИНУТНЫХ УЧАСТКОВ
-========================= */
 
-async function loadSegments() {
-
-  const container =
-    document.getElementById("segments");
-
-  container.innerHTML =
-    "Загрузка истории...";
+/* =====================================================
+   ЦВЕТ СТАТУСА
+===================================================== */
 
 
-  try {
+function setStatus(
 
-    const response = await fetch(
-      HISTORY_URL +
-      "?t=" +
-      Date.now(),
-      {
-        cache: "no-store"
-      }
-    );
+  text,
 
+  color
 
-    if (!response.ok) {
-
-      container.innerHTML =
-        "Ошибка загрузки";
-
-      return;
-    }
-
-
-    const history =
-      await response.json();
-
-
-    if (!history) {
-
-      container.innerHTML =
-        "История пока пустая";
-
-      return;
-    }
-
-
-    const segments = [];
-
-
-    for (
-      const [segmentId, segment]
-      of Object.entries(history)
-    ) {
-
-      /*
-        Новая история имеет:
-
-        history
-          segmentId
-            info
-            points
-      */
-
-      if (
-        segment &&
-        segment.info &&
-        segment.points
-      ) {
-
-        segments.push({
-          id: segmentId,
-          info: segment.info,
-          points: segment.points
-        });
-
-      }
-
-    }
-
-
-    if (segments.length === 0) {
-
-      container.innerHTML =
-        "Новых участков пока нет";
-
-      return;
-    }
-
-
-    /* Новые участки сверху */
-
-    segments.sort(
-      (a, b) =>
-        Number(b.info.start) -
-        Number(a.info.start)
-    );
-
-
-    container.innerHTML = "";
-
-
-    for (const segment of segments) {
-
-      const button =
-        document.createElement("button");
-
-
-      button.textContent =
-        segment.info.name ||
-        formatSegmentName(
-          segment.info.start,
-          segment.info.end
-        );
-
-
-      button.onclick =
-        function () {
-
-          showSegment(
-            segment.points,
-            button
-          );
-
-        };
-
-
-      container.appendChild(
-        button
-      );
-
-    }
-
-
-  } catch (error) {
-
-    container.innerHTML =
-      "Ошибка загрузки истории";
-
-    console.log(error);
-
-  }
-
-}
-
-
-/* =========================
-   ФОРМАТ ВРЕМЕНИ
-========================= */
-
-function formatTime(timestamp) {
-
-  return new Date(
-    timestamp
-  ).toLocaleTimeString(
-    [],
-    {
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
-
-}
-
-
-function formatSegmentName(
-  start,
-  end
 ) {
 
-  return (
-    formatTime(start) +
-    " - " +
-    formatTime(end)
-  );
+
+  const status =
+    document.getElementById(
+      "status"
+    );
+
+
+  status.textContent =
+    text;
+
+
+  status.style.color =
+    color;
 
 }
 
 
-/* =========================
-   ПОКАЗАТЬ ОДИН УЧАСТОК
-========================= */
 
-function showSegment(
-  pointsObject,
-  selectedButton
-) {
+/* =====================================================
+   ПОЛУЧАЕМ КООРДИНАТЫ ИЗ FIREBASE
+===================================================== */
 
-  if (!pointsObject) {
-    return;
-  }
-
-
-  const data =
-    Object.values(pointsObject)
-
-      .filter(item =>
-
-        item &&
-
-        typeof item.latitude === "number" &&
-
-        typeof item.longitude === "number" &&
-
-        typeof item.timestamp === "number" &&
-
-        (
-          typeof item.accuracy !== "number" ||
-          item.accuracy <= 50
-        )
-
-      )
-
-      .sort(
-        (a, b) =>
-          a.timestamp -
-          b.timestamp
-      );
-
-
-  const points = [];
-
-  let previousPoint = null;
-
-
-  for (const item of data) {
-
-    const currentPoint =
-      L.latLng(
-        item.latitude,
-        item.longitude
-      );
-
-
-    if (previousPoint) {
-
-      const distance =
-        previousPoint.distanceTo(
-          currentPoint
-        );
-
-
-      /* Убираем сильный GPS-скачок */
-
-      if (distance > 300) {
-        continue;
-      }
-
-    }
-
-
-    points.push([
-      item.latitude,
-      item.longitude
-    ]);
-
-
-    previousPoint =
-      currentPoint;
-
-  }
-
-
-  if (points.length === 0) {
-
-    alert(
-      "В этом участке нет точек маршрута"
-    );
-
-    return;
-  }
-
-
-  routeLine.setLatLngs(
-    points
-  );
-
-
-  if (!map.hasLayer(routeLine)) {
-
-    routeLine.addTo(map);
-
-  }
-
-
-  const buttons =
-    document.querySelectorAll(
-      "#segments button"
-    );
-
-
-  buttons.forEach(button => {
-
-    button.style.fontWeight =
-      "normal";
-
-  });
-
-
-  if (selectedButton) {
-
-    selectedButton.style.fontWeight =
-      "bold";
-
-  }
-
-
-  if (points.length >= 2) {
-
-    map.fitBounds(
-      routeLine.getBounds(),
-      {
-        padding: [30, 30]
-      }
-    );
-
-  } else {
-
-    map.setView(
-      points[0],
-      17
-    );
-
-  }
-
-}
-
-
-/* =========================
-   СКРЫТЬ ИСТОРИЮ
-========================= */
-
-function hideHistory() {
-
-  if (
-    map.hasLayer(routeLine)
-  ) {
-
-    map.removeLayer(
-      routeLine
-    );
-
-  }
-
-
-  document
-    .getElementById("segments")
-    .innerHTML = "";
-
-}
-
-
-/* =========================
-   ТЕКУЩАЯ ПОЗИЦИЯ
-========================= */
 
 async function updateCar() {
 
+
   try {
 
+
     const response =
+
       await fetch(
 
         FIREBASE_URL +
+
         "?t=" +
+
         Date.now(),
 
         {
-          cache: "no-store"
+
+          cache:
+            "no-store"
+
         }
 
       );
 
 
-    if (!response.ok) {
+
+    if (
+
+      !response.ok
+
+    ) {
+
 
       throw new Error(
+
         "Firebase error"
+
       );
 
     }
 
 
+
     const data =
+
       await response.json();
 
 
+
+    /* -------------------------------------------------
+       ПРОВЕРКА ДАННЫХ
+    ------------------------------------------------- */
+
+
     if (
+
       !data ||
 
       typeof data.latitude !==
@@ -739,50 +587,71 @@ async function updateCar() {
 
       typeof data.longitude !==
         "number"
+
     ) {
 
-      document
-        .getElementById("status")
-        .textContent =
-        "Нет данных";
+
+      setStatus(
+
+        "Нет данных",
+
+        "red"
+
+      );
+
 
       return;
 
     }
 
 
+
     const lat =
       data.latitude;
+
 
     const lon =
       data.longitude;
 
 
-    /* =====================
-       МАРКЕР
 
-       Раньше:
-       marker.setLatLng(...)
+    /* -------------------------------------------------
+       ПЛАВНО ДВИГАЕМ АВТОМОБИЛЬ
+    ------------------------------------------------- */
 
-       Теперь:
-       плавное движение.
-    ===================== */
 
     animateMarker(
+
       lat,
+
       lon,
+
       2800
+
     );
 
 
-    /* ПЕРВЫЙ ЗАПУСК */
 
-    if (firstUpdate) {
+    /* -------------------------------------------------
+       ПЕРВЫЙ ЗАПУСК КАРТЫ
+    ------------------------------------------------- */
+
+
+    if (
+
+      firstUpdate
+
+    ) {
+
 
       map.setView(
+
         [lat, lon],
+
         17
+
       );
+
 
       firstUpdate =
         false;
@@ -790,119 +659,199 @@ async function updateCar() {
     }
 
 
-    /* СКОРОСТЬ */
+
+    /* -------------------------------------------------
+       СКОРОСТЬ
+    ------------------------------------------------- */
+
 
     if (
+
       typeof data.speed ===
-      "number"
+        "number"
+
     ) {
 
+
       document
-        .getElementById("speed")
+        .getElementById(
+          "speed"
+        )
         .textContent =
+
         Math.round(
+
           data.speed
+
         );
+
 
     } else {
 
+
       document
-        .getElementById("speed")
+        .getElementById(
+          "speed"
+        )
         .textContent =
         "---";
 
     }
 
 
-    /* ТОЧНОСТЬ */
+
+    /* -------------------------------------------------
+       ТОЧНОСТЬ GPS
+    ------------------------------------------------- */
+
 
     document
-      .getElementById("accuracy")
+      .getElementById(
+        "accuracy"
+      )
       .textContent =
-      data.accuracy ?? "---";
+
+      data.accuracy ??
+      "---";
 
 
-    /* =====================
+
+    /* -------------------------------------------------
        ОНЛАЙН / ОФЛАЙН
-    ===================== */
+    ------------------------------------------------- */
 
-    if (data.timestamp) {
+
+    if (
+
+      data.timestamp
+
+    ) {
+
 
       const age =
+
         Date.now() -
+
         data.timestamp;
 
 
+
+      /*
+         Данные не старше 30 секунд
+         = автомобиль онлайн.
+      */
+
+
       if (
+
         age <= 30000
+
       ) {
 
-        document
-          .getElementById("status")
-          .textContent =
-          "Автомобиль онлайн";
+
+        setStatus(
+
+          "Автомобиль онлайн",
+
+          "green"
+
+        );
+
 
       } else {
 
-        document
-          .getElementById("status")
-          .textContent =
-          "Автомобиль офлайн";
+
+        setStatus(
+
+          "Автомобиль офлайн",
+
+          "red"
+
+        );
 
       }
 
 
+
+      /* -------------------------------------------------
+         ВРЕМЯ ПОСЛЕДНЕГО ОБНОВЛЕНИЯ
+      ------------------------------------------------- */
+
+
       document
-        .getElementById("time")
+        .getElementById(
+          "time"
+        )
         .textContent =
 
         new Date(
+
           data.timestamp
+
         ).toLocaleTimeString();
 
 
     } else {
 
-      document
-        .getElementById("status")
-        .textContent =
-        "Автомобиль офлайн";
+
+      setStatus(
+
+        "Автомобиль офлайн",
+
+        "red"
+
+      );
 
 
       document
-        .getElementById("time")
+        .getElementById(
+          "time"
+        )
         .textContent =
         "---";
 
     }
 
 
+
   } catch (error) {
 
-    document
-      .getElementById("status")
-      .textContent =
-      "Ошибка подключения";
+
+    setStatus(
+
+      "Ошибка подключения",
+
+      "red"
+
+    );
 
   }
 
 }
 
 
-/* =========================
+
+/* =====================================================
    ЗАПУСК
-========================= */
+===================================================== */
+
 
 updateCar();
 
 
+
 setInterval(
+
   updateCar,
+
   3000
+
 );
 
 
 </script>
 
+
 </body>
+
 </html>
