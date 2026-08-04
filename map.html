@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <title>GPS автомобиля</title>
 
 <link rel="stylesheet"
@@ -18,13 +16,11 @@ button{margin:5px 5px 0 0;padding:7px 12px;font-size:15px}
 #segments{margin-top:5px}
 #map{height:calc(100vh - 170px)}
 </style>
-
 </head>
 
 <body>
 
 <div id="info">
-
 <b>GPS автомобиля</b><br>
 
 Статус: <span id="status">Ожидание...</span><br>
@@ -36,7 +32,6 @@ button{margin:5px 5px 0 0;padding:7px 12px;font-size:15px}
 <button onclick="historyHide()">Скрыть</button>
 
 <div id="segments"></div>
-
 </div>
 
 <div id="map"></div>
@@ -48,8 +43,8 @@ button{margin:5px 5px 0 0;padding:7px 12px;font-size:15px}
 const base=
 "https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com";
 
-const map=
-L.map("map").setView([38.54645,68.91205],16);
+const map=L.map("map")
+.setView([38.54645,68.91205],16);
 
 L.tileLayer(
 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -57,7 +52,8 @@ L.tileLayer(
 ).addTo(map);
 
 const marker=
-L.marker([38.54645,68.91205]).addTo(map);
+L.marker([38.54645,68.91205])
+.addTo(map);
 
 let first=true;
 let animation=null;
@@ -69,7 +65,6 @@ let endMark=null;
 /* ВРЕМЯ ДУШАНБЕ */
 
 function time(t){
-
  return new Date(t).toLocaleTimeString(
   "ru-RU",
   {
@@ -81,7 +76,6 @@ function time(t){
 }
 
 function fullTime(t){
-
  return new Date(t).toLocaleTimeString(
   "ru-RU",
   {
@@ -93,21 +87,15 @@ function fullTime(t){
  );
 }
 
-
-/* ДАТА ДУШАНБЕ */
-
 function day(t){
-
  return new Date(t).toLocaleDateString(
   "en-CA",
-  {
-   timeZone:"Asia/Dushanbe"
-  }
+  {timeZone:"Asia/Dushanbe"}
  );
 }
 
 
-/* ПЛАВНОЕ ДВИЖЕНИЕ */
+/* ДВИЖЕНИЕ МАРКЕРА */
 
 function move(lat,lon){
 
@@ -137,7 +125,7 @@ function move(lat,lon){
 }
 
 
-/* ТЕКУЩАЯ КООРДИНАТА */
+/* ТЕКУЩАЯ ПОЗИЦИЯ */
 
 async function update(){
 
@@ -165,10 +153,7 @@ async function update(){
    :"Автомобиль офлайн";
 
   status.style.color=
-   online
-   ?"green"
-   :"red";
-
+   online?"green":"red";
 
   if(first){
 
@@ -192,17 +177,16 @@ async function update(){
    );
   }
 
+  document.getElementById("speed")
+   .textContent=d.speed??"---";
 
-  document.getElementById("speed").textContent=
-   d.speed??"---";
+  document.getElementById("accuracy")
+   .textContent=d.accuracy??"---";
 
-  document.getElementById("accuracy").textContent=
-   d.accuracy??"---";
-
-  if(d.timestamp)
-   document.getElementById("time").textContent=
-    fullTime(d.timestamp);
-
+  if(d.timestamp){
+   document.getElementById("time")
+    .textContent=fullTime(d.timestamp);
+  }
 
  }catch(e){}
 }
@@ -229,11 +213,9 @@ async function historyLoad(){
   box.innerHTML="";
 
   if(!data){
-
    box.textContent="Истории пока нет";
    return;
   }
-
 
   const today=day(Date.now());
 
@@ -241,8 +223,7 @@ async function historyLoad(){
    Object.keys(data)
    .filter(id=>/^\d+$/.test(id));
 
-
-  /* УДАЛЯЕМ НЕ СЕГОДНЯШНИЕ */
+  /* Удаляем старые дни */
 
   for(const id of all){
 
@@ -255,9 +236,6 @@ async function historyLoad(){
    }
   }
 
-
-  /* ПОКАЗЫВАЕМ ТОЛЬКО СЕГОДНЯ */
-
   const ids=
    all
    .filter(
@@ -267,15 +245,10 @@ async function historyLoad(){
     (a,b)=>Number(a)-Number(b)
    );
 
-
   if(!ids.length){
-
-   box.textContent=
-    "Истории сегодня нет";
-
+   box.textContent="Истории сегодня нет";
    return;
   }
-
 
   ids.forEach(id=>{
 
@@ -285,8 +258,8 @@ async function historyLoad(){
     document.createElement("button");
 
    b.textContent=
-    time(start)
-    +"–"+
+    time(start)+
+    "–"+
     time(start+1800000);
 
    b.onclick=
@@ -295,16 +268,14 @@ async function historyLoad(){
    box.appendChild(b);
   });
 
-
  }catch(e){
 
-  box.textContent=
-   "Ошибка истории";
+  box.textContent="Ошибка истории";
  }
 }
 
 
-/* МАРШРУТ */
+/* ПОКАЗАТЬ МАРШРУТ */
 
 async function showRoute(id){
 
@@ -323,7 +294,6 @@ async function showRoute(id){
   const data=await r.json();
 
   if(!data)return;
-
 
   const points=
    Object.values(data)
@@ -346,13 +316,9 @@ async function showRoute(id){
     ]
    );
 
-
   clearRoute();
 
   if(!points.length)return;
-
-
-  /* СИНЯЯ ЛИНИЯ */
 
   route=
    L.polyline(
@@ -362,9 +328,6 @@ async function showRoute(id){
      weight:5
     }
    ).addTo(map);
-
-
-  /* НАЧАЛО */
 
   startMark=
    L.circleMarker(
@@ -379,9 +342,6 @@ async function showRoute(id){
    .addTo(map)
    .bindPopup("Начало");
 
-
-  /* КОНЕЦ */
-
   endMark=
    L.circleMarker(
     points[points.length-1],
@@ -395,21 +355,20 @@ async function showRoute(id){
    .addTo(map)
    .bindPopup("Конец");
 
-
-  if(points.length>1)
+  if(points.length>1){
 
    map.fitBounds(
     route.getBounds(),
     {padding:[30,30]}
    );
 
-  else
+  }else{
 
    map.setView(
     points[0],
     17
    );
-
+  }
 
  }catch(e){}
 }
@@ -436,7 +395,7 @@ function clearRoute(){
 }
 
 
-/* СКРЫТЬ */
+/* СКРЫТЬ ИСТОРИЮ */
 
 function historyHide(){
 
