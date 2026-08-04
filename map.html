@@ -144,6 +144,192 @@ const marker = L.marker(
 
 
 /* =========================
+   ПЛАВНОЕ ДВИЖЕНИЕ МАРКЕРА
+========================= */
+
+let animationFrame = null;
+
+let displayedLat = null;
+let displayedLon = null;
+
+
+/*
+  Плавно двигаем маркер
+  от текущей позиции
+  к новой GPS-точке.
+*/
+function animateMarker(
+  targetLat,
+  targetLon,
+  duration = 2800
+) {
+
+  /* Первая координата —
+     ставим сразу */
+
+  if (
+    displayedLat === null ||
+    displayedLon === null
+  ) {
+
+    displayedLat = targetLat;
+    displayedLon = targetLon;
+
+    marker.setLatLng([
+      targetLat,
+      targetLon
+    ]);
+
+    return;
+  }
+
+
+  /* Если предыдущая анимация
+     ещё идёт — прекращаем её */
+
+  if (animationFrame !== null) {
+
+    cancelAnimationFrame(
+      animationFrame
+    );
+
+    animationFrame = null;
+  }
+
+
+  /*
+    Начинаем именно с того места,
+    где маркер находится сейчас.
+  */
+
+  const current =
+    marker.getLatLng();
+
+  const startLat =
+    current.lat;
+
+  const startLon =
+    current.lng;
+
+
+  /*
+    Если новая координата практически
+    такая же — ничего не анимируем.
+  */
+
+  const distance =
+    L.latLng(
+      startLat,
+      startLon
+    ).distanceTo(
+      L.latLng(
+        targetLat,
+        targetLon
+      )
+    );
+
+
+  if (distance < 0.5) {
+
+    displayedLat =
+      targetLat;
+
+    displayedLon =
+      targetLon;
+
+    marker.setLatLng([
+      targetLat,
+      targetLon
+    ]);
+
+    return;
+  }
+
+
+  const startTime =
+    performance.now();
+
+
+  function step(now) {
+
+    const elapsed =
+      now - startTime;
+
+
+    let progress =
+      elapsed / duration;
+
+
+    if (progress > 1) {
+
+      progress = 1;
+    }
+
+
+    /*
+      Плавное начало и окончание.
+      Маркер не дёргается резко.
+    */
+
+    const smooth =
+      progress * progress *
+      (3 - 2 * progress);
+
+
+    const lat =
+      startLat +
+      (targetLat - startLat) *
+      smooth;
+
+
+    const lon =
+      startLon +
+      (targetLon - startLon) *
+      smooth;
+
+
+    marker.setLatLng([
+      lat,
+      lon
+    ]);
+
+
+    displayedLat =
+      lat;
+
+    displayedLon =
+      lon;
+
+
+    if (progress < 1) {
+
+      animationFrame =
+        requestAnimationFrame(
+          step
+        );
+
+    } else {
+
+      displayedLat =
+        targetLat;
+
+      displayedLon =
+        targetLon;
+
+      animationFrame = null;
+
+    }
+  }
+
+
+  animationFrame =
+    requestAnimationFrame(
+      step
+    );
+}
+
+
+/* =========================
    ЛИНИЯ МАРШРУТА
 ========================= */
 
@@ -265,10 +451,6 @@ async function loadSegments() {
       const button =
         document.createElement("button");
 
-
-      /* Например:
-         01:30 - 02:00
-      */
 
       button.textContent =
         segment.info.name ||
@@ -447,8 +629,6 @@ function showSegment(
   }
 
 
-  /* Выделяем выбранную кнопку */
-
   const buttons =
     document.querySelectorAll(
       "#segments button"
@@ -470,8 +650,6 @@ function showSegment(
 
   }
 
-
-  /* Показываем весь выбранный маршрут */
 
   if (points.length >= 2) {
 
@@ -580,12 +758,21 @@ async function updateCar() {
       data.longitude;
 
 
-    /* МАРКЕР */
+    /* =====================
+       МАРКЕР
 
-    marker.setLatLng([
+       Раньше:
+       marker.setLatLng(...)
+
+       Теперь:
+       плавное движение.
+    ===================== */
+
+    animateMarker(
       lat,
-      lon
-    ]);
+      lon,
+      2800
+    );
 
 
     /* ПЕРВЫЙ ЗАПУСК */
