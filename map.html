@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GPS автомобиля</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
 html,body{margin:0;height:100%;font-family:Arial}
@@ -38,28 +39,37 @@ button{margin:5px 5px 0 0;padding:7px 12px;font-size:15px}
 
 <script>
 
-const base="https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com";
-const map=L.map("map").setView([38.54645,68.91205],16);
+const base =
+"https://car-gps-tracker-66c4b-default-rtdb.firebaseio.com";
+
+const map =
+L.map("map").setView([38.54645,68.91205],16);
 
 L.tileLayer(
 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 {maxZoom:19}
 ).addTo(map);
 
-const marker=L.marker([38.54645,68.91205]).addTo(map);
+const marker =
+L.marker([38.54645,68.91205]).addTo(map);
 
-let first=true,animation,route;
+let first=true;
+let animation;
+let route;
 
 
-/* ПЛАВНОЕ ДВИЖЕНИЕ */
+/* ТЕКУЩАЯ МАШИНА */
 
 function move(lat,lon){
 
- if(animation) cancelAnimationFrame(animation);
+ if(animation)
+  cancelAnimationFrame(animation);
 
- const s=marker.getLatLng(),t=performance.now();
+ const s=marker.getLatLng();
+ const t=performance.now();
 
  function step(n){
+
   const p=Math.min((n-t)/1800,1);
 
   marker.setLatLng([
@@ -67,56 +77,83 @@ function move(lat,lon){
    s.lng+(lon-s.lng)*p
   ]);
 
-  if(p<1) animation=requestAnimationFrame(step);
+  if(p<1)
+   animation=requestAnimationFrame(step);
  }
 
  animation=requestAnimationFrame(step);
 }
 
 
-/* ONLINE */
-
 function status(text,color){
+
  const s=document.getElementById("status");
+
  s.textContent=text;
  s.style.color=color;
 }
 
 
-/* ТЕКУЩАЯ КООРДИНАТА */
-
 async function update(){
 
  try{
 
-  const r=await fetch(base+"/location.json?t="+Date.now(),{cache:"no-store"});
+  const r=await fetch(
+   base+"/location.json?t="+Date.now(),
+   {cache:"no-store"}
+  );
+
   const d=await r.json();
 
   if(!d) return;
 
-  const online=d.online===true && Date.now()-d.timestamp<5000;
+  const online=
+   d.online===true &&
+   Date.now()-d.timestamp<5000;
 
   status(
-   online?"Автомобиль онлайн":"Автомобиль офлайн",
-   online?"green":"red"
+   online ? "Автомобиль онлайн" : "Автомобиль офлайн",
+   online ? "green" : "red"
   );
 
   if(first){
-   marker.setLatLng([d.latitude,d.longitude]);
-   map.setView([d.latitude,d.longitude],17);
+
+   marker.setLatLng([
+    d.latitude,
+    d.longitude
+   ]);
+
+   map.setView([
+    d.latitude,
+    d.longitude
+   ],17);
+
    first=false;
+
   }else{
-   move(d.latitude,d.longitude);
+
+   move(
+    d.latitude,
+    d.longitude
+   );
   }
 
-  speed.textContent=d.speed??"---";
-  accuracy.textContent=d.accuracy??"---";
+  document.getElementById("speed").textContent=
+   d.speed??"---";
+
+  document.getElementById("accuracy").textContent=
+   d.accuracy??"---";
 
   if(d.timestamp)
-   time.textContent=new Date(d.timestamp).toLocaleTimeString();
+   document.getElementById("time").textContent=
+    new Date(d.timestamp).toLocaleTimeString();
 
  }catch(e){
-  status("Ошибка подключения","red");
+
+  status(
+   "Ошибка подключения",
+   "red"
+  );
  }
 }
 
@@ -125,12 +162,18 @@ async function update(){
 
 async function historyLoad(){
 
- const box=document.getElementById("segments");
+ const box=
+  document.getElementById("segments");
+
  box.innerHTML="Загрузка...";
 
  try{
 
-  const r=await fetch(base+"/history.json?t="+Date.now());
+  const r=await fetch(
+   base+"/history.json?t="+Date.now(),
+   {cache:"no-store"}
+  );
+
   const data=await r.json();
 
   box.innerHTML="";
@@ -140,28 +183,89 @@ async function historyLoad(){
    return;
   }
 
-  Object.keys(data)
-   .sort((a,b)=>b-a)
-   .forEach(id=>{
+  const now=Date.now();
 
-    const start=new Date(Number(id));
-    const end=new Date(Number(id)+1800000);
+  const limit=
+   now-(24*60*60*1000);
 
-    const name=
-     start.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+
-     "–"+
-     end.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  const ids=
+   Object.keys(data)
+   .filter(id=>/^\d+$/.test(id));
 
-    const b=document.createElement("button");
 
-    b.textContent=name;
-    b.onclick=()=>showRoute(id);
+  /* УДАЛЯЕМ СТАРШЕ 24 ЧАСОВ */
 
-    box.appendChild(b);
-   });
+  for(const id of ids){
+
+   if(Number(id)<limit){
+
+    fetch(
+     base+"/history/"+id+".json",
+     {method:"DELETE"}
+    );
+   }
+  }
+
+
+  /* ПОКАЗЫВАЕМ ТОЛЬКО ПОСЛЕДНИЕ 24 ЧАСА */
+
+  const valid=
+   ids
+   .filter(id=>Number(id)>=limit)
+   .sort((a,b)=>Number(b)-Number(a));
+
+
+  if(valid.length===0){
+
+   box.textContent=
+    "Истории за 24 часа нет";
+
+   return;
+  }
+
+
+  valid.forEach(id=>{
+
+   const start=
+    new Date(Number(id));
+
+   const end=
+    new Date(
+     Number(id)+1800000
+    );
+
+   const name=
+    start.toLocaleTimeString(
+     [],
+     {
+      hour:"2-digit",
+      minute:"2-digit"
+     }
+    )
+    +"–"+
+    end.toLocaleTimeString(
+     [],
+     {
+      hour:"2-digit",
+      minute:"2-digit"
+     }
+    );
+
+   const button=
+    document.createElement("button");
+
+   button.textContent=name;
+
+   button.onclick=
+    ()=>showRoute(id);
+
+   box.appendChild(button);
+  });
 
  }catch(e){
-  box.textContent="Ошибка истории";
+
+  box.textContent=
+   "Ошибка истории";
  }
 }
 
@@ -173,47 +277,83 @@ async function showRoute(id){
  try{
 
   const r=await fetch(
-   base+"/history/"+id+"/points.json?t="+Date.now()
+   base+
+   "/history/"+
+   id+
+   "/points.json?t="+
+   Date.now(),
+   {cache:"no-store"}
   );
 
-  const data=await r.json();
+  const data=
+   await r.json();
 
   if(!data) return;
 
   const points=
    Object.values(data)
-    .sort((a,b)=>a.timestamp-b.timestamp)
-    .map(p=>[p.latitude,p.longitude]);
+   .sort(
+    (a,b)=>
+     a.timestamp-b.timestamp
+   )
+   .map(
+    p=>[
+     p.latitude,
+     p.longitude
+    ]
+   );
 
-  if(route) map.removeLayer(route);
+  if(route)
+   map.removeLayer(route);
 
-  route=L.polyline(points,{
-   color:"blue",
-   weight:5
-  }).addTo(map);
+  if(points.length===0)
+   return;
 
-  if(points.length>1)
-   map.fitBounds(route.getBounds(),{padding:[30,30]});
+  route=
+   L.polyline(
+    points,
+    {
+     color:"blue",
+     weight:5
+    }
+   ).addTo(map);
+
+  if(points.length>1){
+
+   map.fitBounds(
+    route.getBounds(),
+    {padding:[30,30]}
+   );
+  }
 
  }catch(e){}
 }
 
 
-/* СКРЫТЬ ИСТОРИЮ */
+/* СКРЫТЬ */
 
 function historyHide(){
 
- document.getElementById("segments").innerHTML="";
+ document.getElementById(
+  "segments"
+ ).innerHTML="";
 
  if(route){
+
   map.removeLayer(route);
   route=null;
  }
 }
 
 
+/* ЗАПУСК */
+
 update();
-setInterval(update,2000);
+
+setInterval(
+ update,
+ 2000
+);
 
 </script>
 </body>
